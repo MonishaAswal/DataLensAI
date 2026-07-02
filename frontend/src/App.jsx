@@ -1,0 +1,156 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+
+// Pages
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Upload from './pages/Upload';
+import Dashboard from './pages/Dashboard';
+import Analytics from './pages/Analytics';
+import Visualizations from './pages/Visualizations';
+import AIReport from './pages/AIReport';
+import Sanitizer from './pages/Sanitizer';
+import HistoryPage from './pages/History';
+import MyDatasets from './pages/MyDatasets';
+import Profile from './pages/Profile';
+
+// Route Guard: Protected Routes for logged in users only
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-slate-500 font-semibold font-mono text-xs gap-3">
+        <div className="w-10 h-10 rounded-full border-4 border-indigo-500/10 border-t-indigo-500 animate-spin"></div>
+        <span>Syncing DataLens Session...</span>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
+
+// Route Guard: Guest Routes for non-logged in users (e.g. login, register)
+const GuestRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-slate-500 font-semibold font-mono text-xs gap-3">
+        <div className="w-10 h-10 rounded-full border-4 border-indigo-500/10 border-t-indigo-500 animate-spin"></div>
+        <span>Syncing DataLens Session...</span>
+      </div>
+    );
+  }
+  
+  return !isAuthenticated ? children : <Navigate to="/upload" replace />;
+};
+
+const App = () => {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Guest Auth Gates */}
+          <Route 
+            path="/login" 
+            element={
+              <GuestRoute>
+                <Login />
+              </GuestRoute>
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              <GuestRoute>
+                <Register />
+              </GuestRoute>
+            } 
+          />
+
+          {/* Protected Application Gates */}
+          <Route 
+            path="/upload" 
+            element={
+              <ProtectedRoute>
+                <Upload />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/overview" 
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/analytics" 
+            element={
+              <ProtectedRoute>
+                <Analytics />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/visualizations" 
+            element={
+              <ProtectedRoute>
+                <Visualizations />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/ai-report" 
+            element={
+              <ProtectedRoute>
+                <AIReport />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/sanitizer" 
+            element={
+              <ProtectedRoute>
+                <Sanitizer />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/history" 
+            element={
+              <ProtectedRoute>
+                <HistoryPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/my-datasets" 
+            element={
+              <ProtectedRoute>
+                <MyDatasets />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/profile" 
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Fallback redirects */}
+          <Route path="/" element={<Navigate to="/upload" replace />} />
+          <Route path="*" element={<Navigate to="/upload" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+};
+
+export default App;

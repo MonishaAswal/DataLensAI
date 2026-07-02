@@ -1,0 +1,14 @@
+# Backend dependencies & environment configs
+node_modules/
+.env
+.env.local
+*.env
+
+# Local User Uploads (do not commit uploaded datasets)
+uploads/*
+!uploads/.gitkeep
+
+# Logs
+logs
+*.log
+npm-debug.log*

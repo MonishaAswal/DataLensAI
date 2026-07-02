@@ -1,0 +1,7 @@
+id,name,age,income,gender
+1,Alice,25,50000,Female
+2,Bob,30,60000,Male
+3,Charlie,,75000,Male
+4,Diana,35,,Female
+5,Evan,40,90000,Male
+6,Evan,40,90000,Male
