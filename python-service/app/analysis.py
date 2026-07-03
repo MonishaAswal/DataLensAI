@@ -16,7 +16,17 @@ def load_dataframe(file_path: str) -> pd.DataFrame:
     elif ext in ['.xlsx', '.xls']:
         return pd.read_excel(file_path)
     elif ext == '.json':
-        return pd.read_json(file_path)
+        try:
+            return pd.read_json(file_path)
+        except ValueError as e:
+            if "If using all scalar values, you must pass an index" in str(e):
+                import json
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return pd.DataFrame([data])
+                raise e
+            raise e
     else:
         raise ValueError(f"Unsupported file format: {ext}")
 

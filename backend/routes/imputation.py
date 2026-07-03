@@ -31,7 +31,19 @@ async def smart_imputation_endpoint(file: UploadFile = File(...)):
         elif ext in ['.xlsx', '.xls']:
             df = pd.read_excel(file_io)
         elif ext == '.json':
-            df = pd.read_json(file_io)
+            try:
+                df = pd.read_json(file_io)
+            except ValueError as e:
+                if "If using all scalar values, you must pass an index" in str(e):
+                    import json
+                    file_io.seek(0)
+                    data = json.loads(file_io.read().decode('utf-8'))
+                    if isinstance(data, dict):
+                        df = pd.DataFrame([data])
+                    else:
+                        raise e
+                else:
+                    raise e
         else:
             df = pd.read_csv(file_io)
             
@@ -57,14 +69,35 @@ async def smart_imputation_endpoint(file: UploadFile = File(...)):
         # (e.g. converted to dict records)
         cleaned_data_records = df_clean.head(100).to_dict(orient='records')
         
+        total_rows = int(df.shape[0])
+        total_columns = int(df.shape[1])
+        total_cells = total_rows * total_columns
+        total_imputed = before_count - after_count
+        columns_with_missing_before = len([col for col in df.columns if df[col].isnull().sum() > 0])
+        data_completeness = round((1.0 - (after_count / total_cells)) * 100, 2) if total_cells > 0 else 100.0
+        imputation_percentage = round((total_imputed / total_cells) * 100, 2) if total_cells > 0 else 0.0
+
+        metrics = {
+            "totalRows": total_rows,
+            "totalColumns": total_columns,
+            "columnsWithMissingBefore": columns_with_missing_before,
+            "totalMissingBefore": before_count,
+            "totalMissingAfter": after_count,
+            "totalImputed": total_imputed,
+            "dataCompleteness": data_completeness,
+            "imputationPercentage": imputation_percentage
+        }
+        
         return {
             "cleanedData": cleaned_data_records,
             "report": report,
             "beforeMissingCount": before_count,
             "afterMissingCount": after_count,
             "columnsProcessed": processed_cols,
-            "cleanedFileBase64": cleaned_file_b64
+            "cleanedFileBase64": cleaned_file_b64,
+            "metrics": metrics
         }
+        
         
     except Exception as e:
         import traceback

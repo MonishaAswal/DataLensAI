@@ -62,7 +62,7 @@ router.post('/smart', protect, upload.single('file'), async (req, res) => {
     }
 
     const result = await response.json();
-    const { cleanedData, report, beforeMissingCount, afterMissingCount, columnsProcessed, cleanedFileBase64 } = result;
+    const { cleanedData, report, beforeMissingCount, afterMissingCount, columnsProcessed, cleanedFileBase64, metrics } = result;
 
     if (!cleanedFileBase64) {
       throw new Error('Cleaned dataset file payload was not returned by the imputation service.');
@@ -90,6 +90,7 @@ router.post('/smart', protect, upload.single('file'), async (req, res) => {
       afterMissingCount,
       columnsProcessed,
       cleanedFileBase64,
+      metrics,
       edaResults: updatedEdaResults,
       rowCount: updatedEdaResults.dimensions?.rows || 0,
       columnCount: updatedEdaResults.dimensions?.columns || 0,
