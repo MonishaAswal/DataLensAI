@@ -68,5 +68,21 @@ const datasetSchema = new mongoose.Schema(
   }
 );
 
-const Dataset = mongoose.model('Dataset', datasetSchema);
-export default Dataset;
+import { getFallbackDb } from '../config/jsonDb.js';
+
+const mongooseDataset = mongoose.model('Dataset', datasetSchema);
+
+const DatasetProxy = new Proxy(mongooseDataset, {
+  get(target, prop) {
+    if (mongoose.connection.readyState === 1) {
+      return Reflect.get(target, prop);
+    }
+    const fallbackDb = getFallbackDb('datasets');
+    if (prop in fallbackDb) {
+      return fallbackDb[prop];
+    }
+    return Reflect.get(target, prop);
+  }
+});
+
+export default DatasetProxy;

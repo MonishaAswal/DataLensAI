@@ -30,5 +30,21 @@ const analysisHistorySchema = new mongoose.Schema(
   }
 );
 
-const AnalysisHistory = mongoose.model('AnalysisHistory', analysisHistorySchema);
-export default AnalysisHistory;
+import { getFallbackDb } from '../config/jsonDb.js';
+
+const mongooseAnalysisHistory = mongoose.model('AnalysisHistory', analysisHistorySchema);
+
+const AnalysisHistoryProxy = new Proxy(mongooseAnalysisHistory, {
+  get(target, prop) {
+    if (mongoose.connection.readyState === 1) {
+      return Reflect.get(target, prop);
+    }
+    const fallbackDb = getFallbackDb('history');
+    if (prop in fallbackDb) {
+      return fallbackDb[prop];
+    }
+    return Reflect.get(target, prop);
+  }
+});
+
+export default AnalysisHistoryProxy;

@@ -1,0 +1,51 @@
+{
+  "users": [
+    {
+      "_id": "1ac5be20-bfa4-4499-9af1-25791035b9a3",
+      "name": "Offline Test User",
+      "email": "test@offline.com",
+      "password": "$2a$10$/gWp.yD5u2xveUMgIjDd5.tuyRxhbFG5vZQek7XhT5R/hJ1jvp5Ay",
+      "createdAt": "2026-07-05T15:34:59.162Z",
+      "updatedAt": "2026-07-05T15:34:59.162Z"
+    }
+  ],
+  "datasets": [
+    {
+      "_id": "2538c157-63c0-4550-82ce-b697f9c853cc",
+      "userId": "1ac5be20-bfa4-4499-9af1-25791035b9a3",
+      "originalName": "offline.csv",
+      "filename": "offline-file.csv",
+      "filePath": "uploads/offline-file.csv",
+      "size": 2048,
+      "rowCount": 100,
+      "columnCount": 5,
+      "columns": [
+        {
+          "name": "col1",
+          "type": "numeric"
+        }
+      ],
+      "edaResults": {
+        "summary": "test"
+      },
+      "createdAt": "2026-07-05T15:34:59.232Z",
+      "updatedAt": "2026-07-05T15:34:59.234Z",
+      "status": "cleaned",
+      "cleaningActions": [
+        "Imputed column col1"
+      ]
+    }
+  ],
+  "history": [
+    {
+      "_id": "e4596336-7f3f-41db-868b-c8c0a4c31552",
+      "userId": "1ac5be20-bfa4-4499-9af1-25791035b9a3",
+      "datasetId": "2538c157-63c0-4550-82ce-b697f9c853cc",
+      "datasetName": "offline.csv",
+      "operationType": "clean",
+      "report": "Successfully imputed columns",
+      "createdAt": "2026-07-05T15:34:59.235Z",
+      "updatedAt": "2026-07-05T15:34:59.235Z"
+    }
+  ]
+}

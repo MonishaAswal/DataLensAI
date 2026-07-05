@@ -43,5 +43,21 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
-export default User;
+import { getFallbackDb } from '../config/jsonDb.js';
+
+const mongooseUser = mongoose.model('User', userSchema);
+
+const UserProxy = new Proxy(mongooseUser, {
+  get(target, prop) {
+    if (mongoose.connection.readyState === 1) {
+      return Reflect.get(target, prop);
+    }
+    const fallbackDb = getFallbackDb('users');
+    if (prop in fallbackDb) {
+      return fallbackDb[prop];
+    }
+    return Reflect.get(target, prop);
+  }
+});
+
+export default UserProxy;
