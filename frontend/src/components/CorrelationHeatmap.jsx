@@ -76,7 +76,7 @@ const CorrelationHeatmap = ({ correlationMatrix }) => {
                       onMouseLeave={() => setHoveredCell(null)}
                     >
                       <span className={`text-[9.5px] font-bold tracking-tight ${Math.abs(val) > 0.4 ? 'text-white' : 'text-slate-300'}`}>
-                        {val !== undefined ? val.toFixed(2) : '-'}
+                        {typeof val === 'number' ? val.toFixed(2) : '-'}
                       </span>
                     </div>
                   );
@@ -86,7 +86,7 @@ const CorrelationHeatmap = ({ correlationMatrix }) => {
           ))}
         </div>
       </div>
-
+ 
       {/* Floating Info Tooltip */}
       <div className="h-10 mt-4 flex items-center justify-center">
         {hoveredCell ? (
@@ -96,7 +96,7 @@ const CorrelationHeatmap = ({ correlationMatrix }) => {
             <span className="font-bold text-cyan-400">{hoveredCell.col}</span>
             <span className="text-slate-550">:</span>
             <span className={`font-mono font-bold ${hoveredCell.value > 0.5 ? 'text-indigo-300' : hoveredCell.value < -0.5 ? 'text-rose-455' : 'text-slate-350'}`}>
-              {hoveredCell.value.toFixed(4)}
+              {typeof hoveredCell.value === 'number' ? hoveredCell.value.toFixed(4) : '-'}
             </span>
           </div>
         ) : (
