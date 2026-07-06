@@ -234,11 +234,15 @@ def analyze_dataset(file_path: str) -> dict:
             })
 
     # Numeric Correlation Matrix & Highly Correlated Check
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
     correlation_matrix = {}
     highly_correlated_pairs = []
     if len(numeric_cols) > 1:
-        corr = df[numeric_cols].corr().fillna(0)
+        corr_matrix = pd.DataFrame.corr(df[numeric_cols])
+        if isinstance(corr_matrix, pd.DataFrame):
+            corr = corr_matrix.fillna(0)
+        else:
+            corr = pd.DataFrame(0.0, index=numeric_cols, columns=numeric_cols)
         for col1 in corr.columns:
             correlation_matrix[col1] = {}
             for col2 in corr.index:
