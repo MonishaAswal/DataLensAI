@@ -23,7 +23,7 @@ const Workspace = ({ activeTab }) => {
     <Layout>
       <div className="space-y-6">
         {/* Workspace Tab Bar */}
-        <div className="flex border border-slate-800/80 p-1.5 bg-slate-950/60 rounded-2xl text-xs font-bold uppercase tracking-wider backdrop-blur-xl mb-6 max-w-4xl shadow-lg">
+        <div className="flex border border-slate-900 p-0.5 bg-slate-955 rounded-lg text-[9px] font-bold uppercase tracking-wider max-w-4xl select-none">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -31,13 +31,13 @@ const Workspace = ({ activeTab }) => {
               <button
                 key={tab.id}
                 onClick={() => navigate(tab.path)}
-                className={`flex-1 py-3 px-4 rounded-xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] ${
+                className={`flex-1 py-2 px-3 rounded-md flex items-center justify-center gap-2 transition-colors ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 border border-indigo-500/30 text-indigo-400 font-extrabold shadow-md shadow-indigo-500/5'
-                    : 'text-slate-500 hover:text-slate-350 hover:bg-slate-900/40 border border-transparent'
+                    ? 'bg-slate-900 border border-slate-850 text-indigo-400 font-bold'
+                    : 'text-slate-550 hover:text-slate-400 border border-transparent'
                 }`}
               >
-                <Icon size={15} className={isActive ? 'animate-pulse text-indigo-400' : 'text-slate-500'} />
+                <Icon size={12} className={isActive ? 'text-indigo-400' : 'text-slate-550'} />
                 <span className="hidden md:inline">{tab.label}</span>
               </button>
             );

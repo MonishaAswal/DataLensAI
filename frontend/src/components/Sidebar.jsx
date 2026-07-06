@@ -89,7 +89,7 @@ const Sidebar = () => {
             return (
               <div
                 key={item.path}
-                className="flex items-center gap-3 px-3 py-2 text-xs text-slate-650 rounded-lg cursor-not-allowed select-none opacity-20 font-medium"
+                className="flex items-center gap-3 px-3 py-2 text-xs text-slate-450 rounded-lg cursor-not-allowed select-none opacity-30 font-semibold"
                 title="Open a dataset workspace first"
               >
                 <Icon size={14} />
