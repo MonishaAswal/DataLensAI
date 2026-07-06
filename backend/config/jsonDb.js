@@ -69,7 +69,8 @@ class MockQuery {
 const userMethods = {
   findOne: (filter) => {
     const data = readData();
-    const user = data.users.find(u => u.email === filter.email);
+    const filterEmail = String(filter.email || '').toLowerCase().trim();
+    const user = data.users.find(u => String(u.email || '').toLowerCase().trim() === filterEmail);
     if (!user) return new MockQuery(null);
     
     // Add matchPassword instance method
@@ -98,6 +99,7 @@ const userMethods = {
     const newUser = {
       _id: crypto.randomUUID(),
       ...userData,
+      email: String(userData.email || '').toLowerCase().trim(),
       password: hashedPassword,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
