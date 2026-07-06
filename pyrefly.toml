@@ -1,0 +1,9 @@
+# Pyrefly configuration
+python-interpreter-path = "venv/Scripts/python.exe"
+
+[tool.pyrefly]
+extra-paths = [
+  ".",
+  "python-service",
+  "python-service/app"
+]
