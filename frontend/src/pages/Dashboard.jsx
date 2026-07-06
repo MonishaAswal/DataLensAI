@@ -490,8 +490,11 @@ const Dashboard = ({ isTabbed = false }) => {
     columns,
     previewRows,
     cleaningActions,
-    createdAt
+    createdAt,
+    data_quality_issues
   } = overviewData;
+
+  const totalIssues = data_quality_issues?.length || 0;
 
   const displayName = datasetName || originalName;
 
@@ -655,11 +658,73 @@ const Dashboard = ({ isTabbed = false }) => {
           />
           <StatCard 
             title="Quality Issues" 
-            value={duplicateCount + missingValueCount > 0 ? "Issues Found" : "Perfect Health"} 
+            value={totalIssues > 0 ? `${totalIssues} Issues Found` : "Perfect Health"} 
             icon={AlertTriangle} 
-            subtext={`${duplicateCount} dups | ${missingValueCount} nulls`}
-            color={duplicateCount + missingValueCount > 0 ? 'rose' : 'emerald'}
+            subtext={`${duplicateCount} dups | ${missingValueCount} nulls | ${totalIssues} flags`}
+            color={totalIssues > 0 ? 'rose' : 'emerald'}
           />
+        </div>
+
+        {/* Automated Quality Flags */}
+        <div className="glass-card rounded-2xl p-6 border border-slate-850 bg-slate-950/20 space-y-4 shadow-md">
+          <div className="flex items-center justify-between border-b border-slate-900 pb-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="text-amber-500 animate-pulse-slow" size={18} />
+              <h3 className="text-sm font-black text-slate-200 uppercase tracking-wider">Automated Quality Flags</h3>
+            </div>
+            <span className="text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-bold px-2 py-0.5 rounded font-mono">
+              {totalIssues} Total Flags
+            </span>
+          </div>
+
+          {totalIssues === 0 ? (
+            <div className="p-6 text-center space-y-2">
+              <CheckCircle2 size={32} className="text-emerald-400 mx-auto" />
+              <p className="text-xs font-bold text-slate-300">Perfect Health Detected!</p>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto">No missing cells, duplicates, outliers, formatting anomalies, constant values, or high null percentages flagged in this dataset audit.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto border border-slate-900 rounded-xl">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900/40 text-slate-400 border-b border-slate-950 font-semibold">
+                    <th className="px-4 py-2.5">Feature/Target</th>
+                    <th className="px-4 py-2.5">Quality Flag</th>
+                    <th className="px-4 py-2.5">Severity</th>
+                    <th className="px-4 py-2.5">Description / Audit Detail</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-900/60 font-medium text-slate-300">
+                  {data_quality_issues.map((issue, idx) => {
+                    const sev = (issue.severity || 'low').toLowerCase();
+                    const badgeClass = 
+                      sev === 'high' ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 
+                      sev === 'medium' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' : 
+                      'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+
+                    return (
+                      <tr key={idx} className="hover:bg-slate-900/10">
+                        <td className="px-4 py-3.5 font-bold text-slate-200 font-mono text-[11px]">
+                          {issue.column || 'All Columns'}
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-300 font-semibold">
+                          {issue.issue}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded border ${badgeClass}`}>
+                            {issue.severity || 'low'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-slate-450 text-[11px] leading-relaxed">
+                          {issue.description}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         {/* Dataset Details & Column Metadata Grid */}

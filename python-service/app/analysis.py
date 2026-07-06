@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+import warnings
 
 def load_dataframe(file_path: str) -> pd.DataFrame:
     """
@@ -76,9 +77,9 @@ def analyze_dataset(file_path: str) -> dict:
         unique_counts[col] = int(df[col].nunique(dropna=True))
 
     # Detailed column-level summary and outlier detection using IQR
-    column_summaries = {}
-    outliers_analysis = {}
-    distributions = {}
+    column_summaries: dict = {}
+    outliers_analysis: dict = {}
+    distributions: dict = {}
     
     for col in df.columns:
         col_data = df[col]
@@ -87,7 +88,7 @@ def analyze_dataset(file_path: str) -> dict:
         # Determine if numeric
         is_numeric = pd.api.types.is_numeric_dtype(col_data)
         
-        summary = {
+        summary: dict = {
             "type": "numeric" if is_numeric else "categorical",
             "unique_count": unique_counts[col],
             "missing_count": missing_analysis[col]["count"]
@@ -160,9 +161,11 @@ def analyze_dataset(file_path: str) -> dict:
                 
                 # Distribution of top 10 categories, combining rest as "Other"
                 top_cats = val_counts.head(10)
-                dist_data = [{"category": str(k), "count": int(v)} for k, v in top_cats.items()]
+                top_cats_dict = top_cats.to_dict()
+                dist_data = [{"category": str(k), "count": int(v)} for k, v in top_cats_dict.items()]
                 if len(val_counts) > 10:
-                    other_count = int(sum(list(val_counts.iloc[10:])))
+                    val_list = list(val_counts)
+                    other_count = sum(val_list[10:])
                     dist_data.append({"category": "Other", "count": other_count})
                 distributions[col] = {
                     "type": "categorical",
@@ -208,9 +211,7 @@ def analyze_dataset(file_path: str) -> dict:
                 
     # 3. Outliers
     total_outliers = 0
-    numeric_columns_count = 0
     for col, o_info in outliers_analysis.items():
-        numeric_columns_count += 1
         if o_info["count"] > 0:
             total_outliers += o_info["count"]
             data_quality_issues.append({
@@ -222,12 +223,10 @@ def analyze_dataset(file_path: str) -> dict:
             
     # 4. Missing values check & High Null Column Check
     total_missing = 0
-    high_null_cols_count = 0
     for col, m_info in missing_analysis.items():
         total_missing += m_info["count"]
         if m_info["count"] > 0:
             if m_info["percentage"] > 50:
-                high_null_cols_count += 1
                 severity = "high"
                 issue_type = f"Critically High Null Percentage ({m_info['percentage']}%)"
             else:
@@ -240,6 +239,15 @@ def analyze_dataset(file_path: str) -> dict:
                 "description": f"{m_info['count']} records ({m_info['percentage']}%) contain empty or null values.",
                 "severity": severity
             })
+
+    # 4b. Duplicate records
+    if duplicate_count > 0:
+        data_quality_issues.append({
+            "column": "All Columns (Entire Dataset)",
+            "issue": "Duplicate Records",
+            "description": f"The dataset contains {duplicate_count} duplicate row(s) ({(duplicate_count/row_count*100):.1f}% of all records). Redundant rows should be dropped.",
+            "severity": "medium"
+        })
 
     # 5. Suspicious / Unnamed / Temporary Columns
     suspicious_cols_count = 0
@@ -254,7 +262,7 @@ def analyze_dataset(file_path: str) -> dict:
                 "severity": "low"
             })
 
-    # 6. Formatting / Casing Inconsistencies
+    # 6. Formatting / Casing Inconsistencies & Mixed Types
     formatting_inconsistent_count = 0
     for col in df.columns:
         if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
@@ -271,11 +279,38 @@ def analyze_dataset(file_path: str) -> dict:
                         "description": "Column contains duplicate categories with different casing or leading/trailing spaces.",
                         "severity": "medium"
                     })
+                
+                # Mixed Data Types
+                type_counts = non_null.apply(lambda x: type(x).__name__).value_counts()
+                if len(type_counts) > 1:
+                    formatting_inconsistent_count += 1
+                    data_quality_issues.append({
+                        "column": col,
+                        "issue": "Mixed Data Types",
+                        "description": f"Column contains inconsistent data formats: detected types {', '.join(type_counts.index)}.",
+                        "severity": "medium"
+                    })
+
+                # Text columns containing mostly numbers (Inconsistent Numeric representation)
+                try:
+                    converted = pd.to_numeric(non_null.astype(str).str.replace(r'[$,\s]', '', regex=True), errors='coerce')
+                    if isinstance(converted, pd.Series):
+                        valid_numeric_pct = (converted.notna().sum() / len(non_null)) * 100
+                        if valid_numeric_pct > 80:
+                            formatting_inconsistent_count += 1
+                            data_quality_issues.append({
+                                "column": col,
+                                "issue": "Inconsistent Format / Mixed Types",
+                                "description": f"This column is stored as text but contains {round(valid_numeric_pct, 1)}% numeric values (possibly containing symbols like $, commas or text).",
+                                "severity": "medium"
+                            })
+                except Exception:
+                    pass
 
     # 7. Numeric Correlation Matrix & Highly Correlated Check
     numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
-    correlation_matrix = {}
-    highly_correlated_pairs = []
+    correlation_matrix: dict = {}
+    highly_correlated_pairs: list = []
     if len(numeric_cols) > 1:
         df_numeric = df[numeric_cols]
         if isinstance(df_numeric, pd.DataFrame):
@@ -312,25 +347,64 @@ def analyze_dataset(file_path: str) -> dict:
                         "severity": "medium"
                     })
 
-    # 9. Invalid dates check: date keyword columns that fail parsing
+    # 8b. Incorrect Numeric values (Negative where positive expected & Infinite values)
+    incorrect_numeric_count = 0
+    for col in df.columns:
+        if col in numeric_cols:
+            non_null_data = df[col].dropna()
+            if not non_null_data.empty:
+                # Check for Infinite Values
+                inf_count = int(np.isinf(non_null_data).sum())
+                if inf_count > 0:
+                    incorrect_numeric_count += 1
+                    data_quality_issues.append({
+                        "column": col,
+                        "issue": "Incorrect Numeric Values (Infinite values)",
+                        "description": f"Column contains {inf_count} infinite values (e.g., division by zero).",
+                        "severity": "high"
+                    })
+                
+                # Check for negative values in columns representing positive quantities
+                neg_count = int((non_null_data < 0).sum())
+                col_lower = str(col).lower()
+                positive_only_keywords = ["age", "price", "salary", "count", "quantity", "rate", "amount", "cost", "total", "balance", "income", "revenue"]
+                if neg_count > 0 and any(kw in col_lower for kw in positive_only_keywords):
+                    incorrect_numeric_count += 1
+                    data_quality_issues.append({
+                        "column": col,
+                        "issue": "Incorrect Numeric Values",
+                        "description": f"Found {neg_count} negative value(s) in a column representing positive quantities (e.g., {col}).",
+                        "severity": "high"
+                    })
+
+    # 9. Invalid dates check
     invalid_dates_count = 0
     for col in df.columns:
-        name_lower = col.lower()
-        date_keywords = ["date", "time", "created", "updated", "dob", "birth"]
-        if any(kw in name_lower for kw in date_keywords) and dtypes_dict[col] == 'object':
+        if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
             non_null = df[col].dropna()
             if not non_null.empty:
                 try:
-                    parsed = pd.to_datetime(non_null, errors='coerce')
-                    nat_pct = (parsed.isna().sum() / len(non_null)) * 100
-                    if nat_pct > 15:
-                        invalid_dates_count += 1
-                        data_quality_issues.append({
-                            "column": col,
-                            "issue": "Invalid/Inconsistent Dates",
-                            "description": f"{round(nat_pct, 1)}% of non-null values failed to parse as date/time formats.",
-                            "severity": "medium"
-                        })
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        parsed_dates = pd.to_datetime(non_null.astype(str), errors='coerce')
+                    if isinstance(parsed_dates, pd.Series):
+                        valid_dates_count = parsed_dates.notna().sum()
+                        valid_dates_pct = (valid_dates_count / len(non_null)) * 100
+                        
+                        name_lower = col.lower()
+                        date_keywords = ["date", "time", "created", "updated", "dob", "birth", "timestamp"]
+                        is_date_named = any(kw in name_lower for kw in date_keywords)
+                        
+                        if (valid_dates_pct > 15 and valid_dates_pct < 100) or (is_date_named and valid_dates_pct < 100 and valid_dates_count > 0):
+                            invalid_pct = 100 - valid_dates_pct
+                            invalid_count = len(non_null) - valid_dates_count
+                            invalid_dates_count += 1
+                            data_quality_issues.append({
+                                "column": col,
+                                "issue": "Invalid/Inconsistent Dates",
+                                "description": f"Detected date-like column with {invalid_count} value(s) ({round(invalid_pct, 1)}%) failing to parse as valid date/time format.",
+                                "severity": "high" if invalid_pct > 30 else "medium"
+                            })
                 except Exception:
                     pass
 
@@ -366,10 +440,11 @@ def analyze_dataset(file_path: str) -> dict:
     invalid_dates_penalty_val = min(10.0, invalid_dates_count * 5.0)
     imbalance_penalty = float(round(imbalance_penalty_val + invalid_dates_penalty_val, 2))
     
-    # 8. Suspicious names & Inconsistent formatting (Up to -15 penalty)
+    # 8. Suspicious names, Inconsistent formatting & Numeric Errors (Up to -15 penalty)
     suspicious_penalty = min(8.0, suspicious_cols_count * 4.0)
     formatting_penalty = min(8.0, formatting_inconsistent_count * 4.0)
-    formatting_issues_penalty = float(round(suspicious_penalty + formatting_penalty, 2))
+    numeric_errors_penalty = min(8.0, incorrect_numeric_count * 4.0)
+    formatting_issues_penalty = float(round(suspicious_penalty + formatting_penalty + numeric_errors_penalty, 2))
     
     raw_score = 100.0 - (missing_values_penalty + duplicates_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty + formatting_issues_penalty)
     quality_score = max(0, min(100, int(raw_score)))

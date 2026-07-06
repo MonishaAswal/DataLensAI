@@ -112,7 +112,8 @@ export const datasetService = {
         columns: data.columns || eda.columns || [],
         previewRows: eda.previewRows || eda.preview_rows || [],
         cleaningActions: data.cleaningActions || [],
-        createdAt: data.createdAt || data.uploadDate || new Date().toISOString()
+        createdAt: data.createdAt || data.uploadDate || new Date().toISOString(),
+        data_quality_issues: eda.data_quality_issues || []
       };
     } catch (err) {
       console.warn('[api] Failed to fetch overview from backend, checking fallback:', err.message);
@@ -140,7 +141,8 @@ export const datasetService = {
             columns: data.columns || eda.columns || [],
             previewRows: eda.preview_rows || eda.previewRows || [],
             cleaningActions: data.cleaningActions || [],
-            createdAt: data.uploadDate || data.createdAt || new Date().toISOString()
+            createdAt: data.uploadDate || data.createdAt || new Date().toISOString(),
+            data_quality_issues: eda.data_quality_issues || []
           };
         }
       } catch (e) {
