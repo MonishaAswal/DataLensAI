@@ -162,7 +162,7 @@ def analyze_dataset(file_path: str) -> dict:
                 top_cats = val_counts.head(10)
                 dist_data = [{"category": str(k), "count": int(v)} for k, v in top_cats.items()]
                 if len(val_counts) > 10:
-                    other_count = int(val_counts.iloc[10:].sum())
+                    other_count = int(sum(list(val_counts.iloc[10:])))
                     dist_data.append({"category": "Other", "count": other_count})
                 distributions[col] = {
                     "type": "categorical",
