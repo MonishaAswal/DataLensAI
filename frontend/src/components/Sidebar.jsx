@@ -11,7 +11,8 @@ import {
   LogOut, 
   Database,
   FileSpreadsheet,
-  User
+  User,
+  Activity
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -35,51 +36,51 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="w-72 bg-slate-950/60 border-r border-slate-800/80 h-screen flex flex-col fixed left-0 top-0 backdrop-blur-xl z-20">
+    <aside className="w-72 bg-cardBg border-r border-slate-900 h-screen flex flex-col fixed left-0 top-0 z-20">
       {/* Brand Header */}
       <div className="p-6 border-b border-slate-900 flex items-center gap-3">
-        <div className="bg-gradient-to-tr from-indigo-500 to-cyan-500 p-2 rounded-lg text-white shadow-lg shadow-indigo-500/20">
-          <Database size={22} className="animate-pulse-slow" />
+        <div className="bg-slate-900 border border-slate-800 p-2 rounded-lg text-white">
+          <Activity size={18} className="text-indigo-400" />
         </div>
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-cyan-200 bg-clip-text text-transparent">
+          <h1 className="text-base font-extrabold tracking-tight text-slate-101">
             DataLens AI
           </h1>
-          <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Cloud Analytics Suite</p>
+          <p className="text-[9px] text-slate-450 font-bold uppercase tracking-widest">Enterprise Analytics</p>
         </div>
       </div>
 
       {/* Active Dataset Status Widget */}
-      <div className="p-4 mx-4 my-4 bg-slate-900/40 border border-slate-800/60 rounded-xl">
-        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wider mb-1.5">Active Workspace</p>
+      <div className="p-4 mx-4 my-4 bg-slate-950 border border-slate-900 rounded-lg">
+        <p className="text-[9px] text-slate-550 font-bold uppercase tracking-wider mb-2">Active Workspace</p>
         {activeDataset ? (
           <div className="flex items-center gap-2.5">
-            <div className="text-indigo-400">
-              <FileSpreadsheet size={18} />
+            <div className="text-indigo-400 bg-indigo-500/5 p-1.5 rounded-md border border-indigo-500/10">
+              <FileSpreadsheet size={15} />
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold truncate text-slate-200">{activeDataset.datasetName || activeDataset.fileName || activeDataset.originalName}</p>
+              <p className="text-xs font-bold truncate text-slate-205">{activeDataset.datasetName || activeDataset.fileName || activeDataset.originalName}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${activeDataset.status === 'cleaned' ? 'bg-emerald-500' : 'bg-indigo-500 animate-pulse'}`}></span>
-                <span className="text-[10px] text-slate-400 capitalize font-medium">{activeDataset.status}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${activeDataset.status === 'cleaned' ? 'bg-emerald-450' : 'bg-indigo-500 animate-pulse'}`}></span>
+                <span className="text-[9px] text-slate-450 capitalize font-mono font-semibold">{activeDataset.status}</span>
               </div>
             </div>
           </div>
         ) : (
           <div>
-            <p className="text-xs text-slate-405 italic font-semibold">No dataset active.</p>
+            <p className="text-[11px] text-slate-550 italic font-medium">No active dataset.</p>
             <button 
               onClick={() => navigate('/my-datasets')}
-              className="mt-2 text-[10px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
+              className="mt-2 text-[9px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider flex items-center gap-1 transition-colors"
             >
-              Open dataset →
+              Open workspace →
             </button>
           </div>
         )}
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isDisabled = item.requiresDataset && !activeDataset;
@@ -88,10 +89,10 @@ const Sidebar = () => {
             return (
               <div
                 key={item.path}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-650 rounded-lg cursor-not-allowed select-none opacity-30 font-medium"
+                className="flex items-center gap-3 px-3 py-2 text-xs text-slate-650 rounded-lg cursor-not-allowed select-none opacity-20 font-medium"
                 title="Open a dataset workspace first"
               >
-                <Icon size={16} />
+                <Icon size={14} />
                 <span>{item.label}</span>
               </div>
             );
@@ -102,14 +103,14 @@ const Sidebar = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-4 py-2.5 text-sm rounded-lg font-semibold transition-all duration-200 group ${
+                `flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold transition-all group ${
                   isActive
-                    ? 'bg-gradient-to-r from-indigo-500/10 to-cyan-500/10 border-l-2 border-indigo-500 text-indigo-400'
-                    : 'text-slate-450 hover:bg-slate-900/60 hover:text-slate-200'
+                    ? 'bg-slate-900 border-l-2 border-indigo-500 text-slate-101'
+                    : 'text-slate-450 hover:bg-slate-900/40 hover:text-slate-205'
                 }`
               }
             >
-              <Icon size={16} className="group-hover:scale-105 transition-transform" />
+              <Icon size={14} className="transition-transform" />
               <span>{item.label}</span>
             </NavLink>
           );
@@ -118,21 +119,21 @@ const Sidebar = () => {
 
       {/* User Section / Footer */}
       <div className="p-4 border-t border-slate-900 flex flex-col gap-3">
-        <div className="flex items-center gap-3 px-2">
-          <div className="w-9 h-9 rounded-full bg-indigo-650 flex items-center justify-center text-white font-extrabold text-sm shadow-md shadow-indigo-600/15">
+        <div className="flex items-center gap-3 px-1">
+          <div className="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-205 font-black text-xs">
             {user?.name ? user.name[0].toUpperCase() : 'U'}
           </div>
           <div className="overflow-hidden">
-            <p className="text-sm font-semibold truncate text-slate-200">{user?.name || 'User'}</p>
-            <p className="text-xs text-slate-500 truncate">{user?.email || 'user@datalens.ai'}</p>
+            <p className="text-xs font-bold truncate text-slate-205">{user?.name || 'User'}</p>
+            <p className="text-[10px] text-slate-450 truncate">{user?.email || 'user@datalens.ai'}</p>
           </div>
         </div>
         
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/5 rounded-lg border border-slate-900 hover:border-rose-500/20 transition-all"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 text-[10px] font-bold text-rose-450 hover:text-rose-400 hover:bg-rose-500/5 rounded-lg border border-slate-900 hover:border-rose-500/10 transition-all uppercase tracking-wider"
         >
-          <LogOut size={14} />
+          <LogOut size={12} />
           <span>Sign Out</span>
         </button>
       </div>

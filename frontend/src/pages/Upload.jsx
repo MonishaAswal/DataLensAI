@@ -5,8 +5,6 @@ import { datasetService } from '../services/api';
 import Layout from '../components/Layout';
 import { UploadCloud, File, AlertCircle, RefreshCw } from 'lucide-react';
 
-
-
 const Upload = () => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
@@ -86,11 +84,10 @@ const Upload = () => {
     setUploadProgress(35);
 
     try {
-      // Call backend stateful upload & analysis endpoint
+      // Call backend upload
       const savedDataset = await datasetService.upload(file);
       setUploadProgress(80);
 
-      // Inject document ID as BOTH _id (for backend compatibility) and id
       const activeDatasetPayload = {
         id: savedDataset._id,
         _id: savedDataset._id,
@@ -100,8 +97,7 @@ const Upload = () => {
       setActiveDataset(activeDatasetPayload);
       setUploadProgress(100);
       
-      // Delay slightly for visual effect
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 600));
       navigate('/overview');
 
     } catch (err) {
@@ -117,40 +113,40 @@ const Upload = () => {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto mt-6">
+      <div className="max-w-2xl mx-auto mt-4">
         {/* Header */}
         <div className="mb-8">
-          <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight">Upload Dataset</h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Analyze, clean, and generate AI-driven insights for your tabular datasets instantly.
+          <h2 className="text-2xl font-extrabold text-slate-101 tracking-tight">Upload Dataset</h2>
+          <p className="text-slate-450 text-xs mt-1 leading-relaxed">
+            Upload CSV, Excel, or JSON datasets for full exploratory data analysis (EDA), automated sanitization, and AI reports.
           </p>
         </div>
 
         {isProcessing ? (
-          /* High Fidelity Processing loader screen */
-          <div className="glass-card rounded-2xl p-12 flex flex-col items-center justify-center border border-indigo-500/20 text-center min-h-[380px] shadow-lg shadow-indigo-500/5">
+          /* Processing loader screen */
+          <div className="glass-card rounded-xl p-12 flex flex-col items-center justify-center text-center min-h-[350px]">
             <div className="relative mb-6">
-              <div className="w-16 h-16 rounded-full border-4 border-indigo-500/10 border-t-indigo-500 animate-spin"></div>
+              <div className="w-12 h-12 rounded-full border-4 border-slate-900 border-t-indigo-500 animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center text-indigo-400">
-                <RefreshCw size={24} className="animate-pulse" />
+                <RefreshCw size={16} className="animate-pulse" />
               </div>
             </div>
             
-            <h3 className="text-lg font-extrabold text-slate-200">{processingStatus}</h3>
+            <h3 className="text-sm font-bold text-slate-205">{processingStatus}</h3>
             
             {/* Progress indicators */}
-            <div className="w-full max-w-sm bg-slate-900 rounded-full h-1.5 mt-6 overflow-hidden">
+            <div className="w-full max-w-xs bg-slate-900 rounded-full h-1 mt-6 overflow-hidden">
               <div 
-                className="bg-gradient-to-r from-indigo-500 to-cyan-500 h-full rounded-full transition-all duration-300"
+                className="bg-indigo-500 h-full rounded-full transition-all duration-300"
                 style={{ width: `${uploadProgress}%` }}
               ></div>
             </div>
             
-            <p className="text-xs text-slate-500 font-bold mt-2.5 uppercase tracking-widest font-mono">
+            <p className="text-[9px] text-slate-450 font-bold mt-2.5 uppercase tracking-wider font-mono">
               {uploadProgress > 0 && uploadProgress < 100 ? `Progress: ${uploadProgress}%` : 'Cloud Analytics Stage'}
             </p>
             
-            <div className="mt-8 text-xs text-slate-500 max-w-md">
+            <div className="mt-8 text-xs text-slate-550 max-w-sm leading-relaxed">
               <span className="font-semibold text-indigo-400">DataLens Engine</span> uploads your dataset securely to Cloud Storage, compiles descriptive statistics, performs outlier bounds audits, and formats correlations.
             </div>
           </div>
@@ -158,18 +154,18 @@ const Upload = () => {
           /* Normal drag drop dashboard upload zone */
           <div className="space-y-6">
             {error && (
-              <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-450 rounded-xl text-xs font-semibold flex items-start gap-3">
-                <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+              <div className="p-3.5 bg-rose-500/10 border border-rose-500/25 text-rose-455 rounded-lg text-xs font-semibold flex items-start gap-3">
+                <AlertCircle size={15} className="mt-0.5 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             {/* Drag drop board container */}
             <div
-              className={`glass-card rounded-2xl border-2 border-dashed p-12 text-center transition-all duration-200 cursor-pointer flex flex-col items-center justify-center min-h-[320px] ${
+              className={`glass-card rounded-xl border-2 border-dashed p-12 text-center transition-colors cursor-pointer flex flex-col items-center justify-center min-h-[280px] ${
                 dragActive
                   ? 'border-indigo-500 bg-indigo-500/5'
-                  : 'border-slate-800 hover:border-slate-700/80 hover:bg-slate-900/10'
+                  : 'border-slate-850 hover:border-slate-800 hover:bg-slate-950/20'
               }`}
               onDragEnter={handleDrag}
               onDragOver={handleDrag}
@@ -185,20 +181,20 @@ const Upload = () => {
                 onChange={handleChange}
               />
               
-              <div className="bg-slate-900/60 p-4 rounded-full text-indigo-400 mb-4 border border-slate-800 shadow-md">
-                <UploadCloud size={32} />
+              <div className="bg-slate-950 p-3 rounded-lg text-slate-450 mb-4 border border-slate-900 shadow-sm">
+                <UploadCloud size={24} className="text-slate-400" />
               </div>
 
-              <h3 className="text-base font-extrabold text-slate-200">
+              <h3 className="text-sm font-bold text-slate-205">
                 Drag & drop your dataset here
               </h3>
-              <p className="text-xs text-slate-500 mt-1.5 font-medium">
-                Support for CSV, XLSX, XLS, and JSON files up to 10MB.
+              <p className="text-[10px] text-slate-450 mt-1 font-medium">
+                CSV, XLSX, XLS, and JSON files up to 10MB.
               </p>
               
               <button
                 type="button"
-                className="mt-6 px-5 py-2.5 bg-slate-900 hover:bg-slate-850 text-slate-335 rounded-xl text-xs font-bold uppercase tracking-wider border border-slate-800 transition-all active:scale-[0.98]"
+                className="mt-6 px-4 py-2 bg-slate-900 hover:bg-slate-850 text-slate-350 rounded-lg text-[10px] font-bold uppercase tracking-wider border border-slate-800 transition-colors"
               >
                 Select File
               </button>
@@ -206,14 +202,14 @@ const Upload = () => {
 
             {/* Display Selected File Preview info card */}
             {file && (
-              <div className="glass-card rounded-xl p-4 border border-indigo-500/10 flex items-center justify-between animate-slide-up">
+              <div className="glass-card rounded-lg p-4 border border-indigo-500/10 flex items-center justify-between animate-slide-up">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-                    <File size={20} />
+                  <div className="p-2 bg-indigo-500/10 text-indigo-400 rounded-md border border-indigo-500/15">
+                    <File size={16} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-200 truncate max-w-[280px]">{file.name}</p>
-                    <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                    <p className="text-xs font-bold text-slate-202 truncate max-w-[240px]">{file.name}</p>
+                    <p className="text-[9px] text-slate-450 font-mono mt-0.5">
                       {(file.size / 1024).toFixed(1)} KB • {file.name.substring(file.name.lastIndexOf('.')).toUpperCase()}
                     </p>
                   </div>
@@ -221,7 +217,7 @@ const Upload = () => {
                 
                 <button
                   onClick={handleUploadSubmit}
-                  className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-md shadow-indigo-600/10 active:scale-[0.98] transition-all"
+                  className="px-4 py-2 bg-indigo-650 hover:bg-indigo-600 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors"
                 >
                   Analyze Dataset
                 </button>

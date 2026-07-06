@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { datasetService, historyService } from '../services/api';
 import Layout from '../components/Layout';
-
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
 import { 
   BarChart, 
@@ -27,17 +26,11 @@ import {
   BarChart3, 
   ScatterChart as ScatterIcon, 
   Compass, 
-  Info, 
   Download, 
-  AlertTriangle,
   Loader2,
   ListMinus,
   TrendingDown,
-  LineChart,
-  PieChart as PieIcon,
   Sparkles,
-  HelpCircle,
-  TrendingUp,
   Brain
 } from 'lucide-react';
 
@@ -187,9 +180,9 @@ const Visualizations = ({ isTabbed = false }) => {
     const missingPct = ((colSummary.missing_count / (activeDataset.rowCount || 1)) * 100).toFixed(1);
     
     if (parseFloat(missingPct) > 10) {
-      insights.push(`🚨 Highly Incomplete: This column is missing ${missingPct}% of its values. Imputation is strongly recommended before downstream ML training.`);
+      insights.push(`🚨 Highly Incomplete: This column is missing ${missingPct}% of its values. Imputation is recommended before downstream model training.`);
     } else if (parseFloat(missingPct) > 0) {
-      insights.push(`ℹ️ Slight Sparsity: A minor ${missingPct}% of records are null. Can be easily resolved in standard sanitization.`);
+      insights.push(`ℹ️ Slight Sparsity: A minor ${missingPct}% of records are null. Can be resolved in standard sanitization.`);
     }
 
     if (isNumericCol) {
@@ -199,10 +192,10 @@ const Visualizations = ({ isTabbed = false }) => {
       const diffPct = Math.abs((meanVal - medianVal) / (meanVal || 1)) * 100;
       
       if (diffPct > 15) {
-        insights.push(`📈 Distribution Skewness: The mean (${meanVal.toFixed(2)}) is significantly different from the median (${medianVal.toFixed(2)}), suggesting a highly skewed distribution.`);
+        insights.push(`📈 Distribution Skewness: The mean (${meanVal.toFixed(2)}) is significantly different from the median (${medianVal.toFixed(2)}), suggesting a skewed distribution.`);
       }
       if (stdVal > meanVal) {
-        insights.push(`⚠️ High Variance: Standard deviation (${stdVal.toFixed(2)}) exceeds the mean (${meanVal.toFixed(2)}), showing large dispersion of numeric data.`);
+        insights.push(`⚠️ High Variance: Standard deviation (${stdVal.toFixed(2)}) exceeds the mean (${meanVal.toFixed(2)}), showing dispersion of numeric data.`);
       }
     } else {
       if (colSummary.top && colSummary.freq) {
@@ -244,11 +237,11 @@ const Visualizations = ({ isTabbed = false }) => {
         canvas.height = svg.clientHeight || 450;
         
         const context = canvas.getContext('2d');
-        context.fillStyle = '#0f172a'; // SaaS Slate-900 background
+        context.fillStyle = '#060608'; // Premium background color
         context.fillRect(0, 0, canvas.width, canvas.height);
         
-        context.fillStyle = '#f8fafc';
-        context.font = 'bold 15px "Inter", sans-serif';
+        context.fillStyle = '#f4f4f5';
+        context.font = 'bold 13px "Inter", sans-serif';
         context.fillText(title, 20, 30);
         
         context.drawImage(image, 0, 45, canvas.width, canvas.height - 55);
@@ -272,15 +265,14 @@ const Visualizations = ({ isTabbed = false }) => {
   const renderActiveChart = () => {
     if (!distInfo || !distInfo.data || distInfo.data.length === 0) {
       return (
-        <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-          <p className="text-slate-500 italic text-sm">No distribution metrics computed for column: {selectedCol}</p>
+        <div className="flex items-center justify-center p-8 bg-slate-950 border border-slate-900 rounded-lg min-h-[200px]">
+          <p className="text-slate-550 italic text-xs">No distribution metrics computed for column: {selectedCol}</p>
         </div>
       );
     }
 
     const chartData = distInfo.data.map((item, idx) => ({
       ...item,
-      // Adapt keys dynamically for different Recharts chart structures
       name: isNumericCol ? item.bin_range : item.category,
       value: item.count,
       index: idx
@@ -292,8 +284,8 @@ const Visualizations = ({ isTabbed = false }) => {
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Tooltip 
-                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }}
-                itemStyle={{ color: '#f8fafc' }}
+                contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }}
+                itemStyle={{ color: '#f4f4f5' }}
               />
               <Pie
                 data={chartData}
@@ -301,7 +293,7 @@ const Visualizations = ({ isTabbed = false }) => {
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={100}
+                outerRadius={80}
                 label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                 labelLine={true}
               >
@@ -309,54 +301,54 @@ const Visualizations = ({ isTabbed = false }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+              <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} />
             </PieChart>
           </ResponsiveContainer>
         );
       case 'line':
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -25, bottom: 5 }}>
               <defs>
                 <linearGradient id="lineColor" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2}/>
                   <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
-              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
-              <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#lineColor)" name="Count" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+              <XAxis dataKey="name" stroke="#52525b" fontSize={8} tickLine={false} />
+              <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+              <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#lineColor)" name="Count" />
             </AreaChart>
           </ResponsiveContainer>
         );
       case 'area':
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -25, bottom: 5 }}>
               <defs>
                 <linearGradient id="areaColor" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.2}/>
                   <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
-              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
-              <Area type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#areaColor)" name="Count" />
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+              <XAxis dataKey="name" stroke="#52525b" fontSize={8} tickLine={false} />
+              <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+              <Area type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={1.5} fillOpacity={1} fill="url(#areaColor)" name="Count" />
             </AreaChart>
           </ResponsiveContainer>
         );
       case 'scatter':
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-              <XAxis type="category" dataKey="name" name="Value" stroke="#64748b" fontSize={9} />
-              <YAxis type="number" dataKey="value" name="Count" stroke="#64748b" fontSize={10} />
-              <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+            <ScatterChart margin={{ top: 20, right: 20, left: -25, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+              <XAxis type="category" dataKey="name" name="Value" stroke="#52525b" fontSize={8} />
+              <YAxis type="number" dataKey="value" name="Count" stroke="#52525b" fontSize={8} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
               <Scatter name="Distribution" data={chartData} fill="#8b5cf6">
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -366,15 +358,14 @@ const Visualizations = ({ isTabbed = false }) => {
           </ResponsiveContainer>
         );
       case 'bar':
-        // Horizontal Bar
         return (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-              <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} />
-              <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} width={80} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
-              <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Count">
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" horizontal={false} />
+              <XAxis type="number" stroke="#52525b" fontSize={8} tickLine={false} />
+              <YAxis type="category" dataKey="name" stroke="#52525b" fontSize={8} tickLine={false} width={80} />
+              <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+              <Bar dataKey="value" fill="#8b5cf6" radius={[0, 2, 2, 0]} name="Count">
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
@@ -385,8 +376,8 @@ const Visualizations = ({ isTabbed = false }) => {
       case 'boxplot':
         if (!colSummary || colSummary.min === undefined || colSummary.min === null) {
           return (
-            <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-              <p className="text-slate-500 italic text-sm">Box Plot is only available for numerical columns.</p>
+            <div className="flex items-center justify-center p-8 bg-slate-950 border border-slate-900 rounded-lg min-h-[200px]">
+              <p className="text-slate-550 italic text-xs">Box Plot is only available for numerical columns.</p>
             </div>
           );
         }
@@ -399,26 +390,18 @@ const Visualizations = ({ isTabbed = false }) => {
         const getPctVal = (val) => ((val - minVal) / rangeVal) * 100;
         
         return (
-          <div className="flex flex-col items-center justify-center p-6 w-full h-full min-h-[260px] text-slate-200">
-            <div className="relative w-full max-w-md h-20 flex items-center px-4 bg-slate-900/50 rounded-xl border border-slate-800">
-              {/* Whiskers line */}
-              <div className="absolute left-[10%] right-[10%] h-0.5 bg-slate-700"></div>
-              
-              {/* Left whisker cap */}
-              <div className="absolute left-[10%] h-6 w-0.5 bg-slate-500"></div>
-              
-              {/* Right whisker cap */}
-              <div className="absolute right-[10%] h-6 w-0.5 bg-slate-500"></div>
-              
-              {/* Box (IQR) */}
+          <div className="flex flex-col items-center justify-center p-6 w-full h-full min-h-[220px] text-slate-200">
+            <div className="relative w-full max-w-sm h-14 flex items-center px-4 bg-slate-950 rounded-lg border border-slate-900">
+              <div className="absolute left-[10%] right-[10%] h-0.5 bg-slate-800"></div>
+              <div className="absolute left-[10%] h-4 w-0.5 bg-slate-500"></div>
+              <div className="absolute right-[10%] h-4 w-0.5 bg-slate-500"></div>
               <div 
-                className="absolute h-10 bg-indigo-500/20 border border-indigo-500 rounded flex items-center"
+                className="absolute h-8 bg-indigo-500/10 border border-indigo-500/20 rounded flex items-center"
                 style={{
                   left: `${10 + getPctVal(q25Val) * 0.8}%`,
                   width: `${Math.max(1, getPctVal(q75Val - q25Val) * 0.8)}%`
                 }}
               >
-                {/* Median line */}
                 <div 
                   className="absolute top-0 bottom-0 w-0.5 bg-cyan-400"
                   style={{ left: `${((medVal - q25Val) / (q75Val - q25Val || 1)) * 100}%` }}
@@ -426,26 +409,26 @@ const Visualizations = ({ isTabbed = false }) => {
               </div>
             </div>
             
-            <div className="grid grid-cols-5 gap-2 w-full max-w-md mt-6 text-center text-[10px] font-mono font-bold text-slate-400">
+            <div className="grid grid-cols-5 gap-2 w-full max-w-sm mt-4 text-center text-[9px] font-mono font-bold text-slate-500">
               <div>
-                <span className="block text-slate-500 text-[8px] uppercase mb-1">Min</span>
-                <span>{minVal.toFixed(2)}</span>
+                <span className="block text-[8px] mb-0.5">Min</span>
+                <span className="text-slate-350">{minVal.toFixed(1)}</span>
               </div>
               <div>
-                <span className="block text-indigo-400 text-[8px] uppercase mb-1">Q1 (25%)</span>
-                <span>{q25Val.toFixed(2)}</span>
+                <span className="block text-indigo-400 text-[8px] mb-0.5">Q1</span>
+                <span className="text-slate-350">{q25Val.toFixed(1)}</span>
               </div>
               <div>
-                <span className="block text-cyan-400 text-[8px] uppercase mb-1">Median</span>
-                <span>{medVal.toFixed(2)}</span>
+                <span className="block text-cyan-400 text-[8px] mb-0.5">Med</span>
+                <span className="text-slate-350">{medVal.toFixed(1)}</span>
               </div>
               <div>
-                <span className="block text-indigo-400 text-[8px] uppercase mb-1">Q3 (75%)</span>
-                <span>{q75Val.toFixed(2)}</span>
+                <span className="block text-indigo-400 text-[8px] mb-0.5">Q3</span>
+                <span className="text-slate-350">{q75Val.toFixed(1)}</span>
               </div>
               <div>
-                <span className="block text-slate-500 text-[8px] uppercase mb-1">Max</span>
-                <span>{maxVal.toFixed(2)}</span>
+                <span className="block text-[8px] mb-0.5">Max</span>
+                <span className="text-slate-350">{maxVal.toFixed(1)}</span>
               </div>
             </div>
           </div>
@@ -453,29 +436,18 @@ const Visualizations = ({ isTabbed = false }) => {
       case 'column':
       case 'histogram':
       default:
-        // Vertical Column
         return (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
-              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
-              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
-              <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} name="Count">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+              <XAxis dataKey="name" stroke="#52525b" fontSize={8} tickLine={false} />
+              <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+              <Bar dataKey="value" fill="#6366f1" radius={[2, 2, 0, 0]} name="Count">
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? 'url(#indigoGrad)' : 'url(#cyanGrad)'} />
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Bar>
-              <defs>
-                <linearGradient id="indigoGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.85}/>
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.45}/>
-                </linearGradient>
-                <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.85}/>
-                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.45}/>
-                </linearGradient>
-              </defs>
             </BarChart>
           </ResponsiveContainer>
         );
@@ -484,26 +456,26 @@ const Visualizations = ({ isTabbed = false }) => {
 
   if (loading) {
     return wrapLayout(
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
-        <Loader2 size={36} className="text-indigo-500 animate-spin" />
-        <p className="text-slate-400 text-sm font-semibold">Generating visual analytics charts...</p>
+      <div className="flex flex-col items-center justify-center min-h-[350px] text-center space-y-4">
+        <Loader2 size={24} className="text-indigo-500 animate-spin" />
+        <p className="text-slate-455 text-xs font-semibold">Generating visual analytics charts...</p>
       </div>
     );
   }
 
   if (error) {
     return wrapLayout(
-      <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
-        <h4 className="text-rose-400 font-extrabold text-sm mb-2">Error Loading Visualizations</h4>
-        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
+      <div className="glass-card rounded-lg p-8 border border-rose-500/10 bg-rose-500/5 text-center my-6">
+        <h4 className="text-rose-455 font-bold text-xs mb-2">Error Loading Visualizations</h4>
+        <p className="text-[11px] text-slate-500 max-w-md mx-auto mb-4">{error}</p>
       </div>
     );
   }
 
   if (!activeDataset || !visualizationData) {
     return wrapLayout(
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <p className="text-slate-400 italic">No dataset active in current workspace.</p>
+      <div className="flex flex-col items-center justify-center min-h-[350px] text-center">
+        <p className="text-slate-550 italic text-xs">No dataset active in current workspace.</p>
       </div>
     );
   }
@@ -512,94 +484,94 @@ const Visualizations = ({ isTabbed = false }) => {
   const datasetDisplayName = activeDataset.datasetName || activeDataset.originalName || 'Active Dataset';
 
   return wrapLayout(
-    <div className="space-y-8">
+    <div className="space-y-6 max-w-5xl mx-auto animate-fade-in">
         {/* Header Title */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2.5">
-              <BarChart3 className="text-indigo-400" size={28} />
+            <h2 className="text-2xl font-extrabold text-slate-101 tracking-tight flex items-center gap-2.5">
+              <BarChart3 className="text-indigo-400" size={24} />
               <span>Visual Analytics</span>
             </h2>
-            <p className="text-slate-400 text-sm mt-1">
-              Explore dynamic charts, recommend visual representation models, and audit Pearson correlation spaces in <span className="text-indigo-400 font-bold">{datasetDisplayName}</span>.
+            <p className="text-slate-455 text-xs mt-1">
+              Explore value distribution densities, outlier properties, and correlation coefficients matrix in <span className="text-indigo-405 font-bold">{datasetDisplayName}</span>.
             </p>
           </div>
           
           {/* Tab Selector */}
-          <div className="flex border border-slate-900 p-1 bg-slate-950/40 rounded-xl text-xs font-bold uppercase tracking-wider overflow-x-auto self-start xl:self-auto">
+          <div className="flex border border-slate-900 p-0.5 bg-slate-955 rounded-lg text-[9px] font-bold uppercase tracking-wider overflow-x-auto self-start xl:self-auto select-none">
             <button
               onClick={() => setActiveTab('distribution')}
-              className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors whitespace-nowrap ${
                 activeTab === 'distribution' 
-                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
-                  : 'text-slate-500 hover:text-slate-350'
+                  ? 'bg-slate-900 border border-slate-850 text-indigo-400' 
+                  : 'text-slate-550 hover:text-slate-400'
               }`}
             >
-              <BarChart3 size={14} />
+              <BarChart3 size={11} />
               <span>Features Density</span>
             </button>
             
             <button
               onClick={() => setActiveTab('correlation')}
-              className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors whitespace-nowrap ${
                 activeTab === 'correlation' 
-                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
-                  : 'text-slate-500 hover:text-slate-350'
+                  ? 'bg-slate-900 border border-slate-850 text-indigo-400' 
+                  : 'text-slate-555 hover:text-slate-400'
               }`}
             >
-              <ScatterIcon size={14} />
-              <span>Correlations Matrix</span>
+              <ScatterIcon size={11} />
+              <span>Correlations</span>
             </button>
             
             <button
               onClick={() => setActiveTab('missing')}
-              className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors whitespace-nowrap ${
                 activeTab === 'missing' 
-                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
-                  : 'text-slate-500 hover:text-slate-350'
+                  ? 'bg-slate-900 border border-slate-850 text-indigo-400' 
+                  : 'text-slate-555 hover:text-slate-400'
               }`}
             >
-              <ListMinus size={14} />
-              <span>Missing Values</span>
+              <ListMinus size={11} />
+              <span>Missingness</span>
             </button>
-
+            
             <button
               onClick={() => setActiveTab('outliers')}
-              className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 transition-colors whitespace-nowrap ${
                 activeTab === 'outliers' 
-                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
-                  : 'text-slate-500 hover:text-slate-350'
+                  ? 'bg-slate-900 border border-slate-850 text-indigo-400' 
+                  : 'text-slate-555 hover:text-slate-400'
               }`}
             >
-              <TrendingDown size={14} />
-              <span>Outliers Audit</span>
+              <TrendingDown size={11} />
+              <span>Outliers</span>
             </button>
           </div>
         </div>
 
         {/* Tab contents */}
         {activeTab === 'distribution' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="glass-card rounded-lg p-5 grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* Columns list */}
-            <div className="lg:col-span-1 border-r border-slate-900/60 pr-0 lg:pr-6">
-              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3.5 flex items-center gap-1.5">
-                <Compass size={14} />
+            <div className="lg:col-span-1 border-r border-slate-900/60 pr-0 lg:pr-5">
+              <h4 className="text-[9px] font-bold text-slate-550 uppercase tracking-wider mb-3 flex items-center gap-1">
+                <Compass size={12} className="text-slate-455" />
                 <span>Select Feature</span>
               </h4>
               
-              <div className="space-y-1 overflow-y-auto max-h-[380px] pr-2">
+              <div className="space-y-0.5 overflow-y-auto max-h-[350px] pr-1">
                 {columns.map((col) => (
                   <button
                     key={col.name}
                     onClick={() => setSelectedCol(col.name)}
-                    className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all ${
+                    className={`w-full text-left px-3 py-1.5 rounded-md text-xs font-bold flex items-center justify-between border transition-all ${
                       selectedCol === col.name
-                        ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-bold'
-                        : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-900/40 hover:text-slate-300'
+                        ? 'bg-slate-900 border-l-2 border-indigo-500 text-indigo-400'
+                        : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-950 hover:text-slate-300'
                     }`}
                   >
-                    <span className="truncate max-w-[140px]">{col.name}</span>
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 uppercase tracking-widest font-mono">
+                    <span className="truncate max-w-[130px]">{col.name}</span>
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-950 border border-slate-900 text-slate-500 uppercase tracking-widest font-mono">
                       {col.type}
                     </span>
                   </button>
@@ -608,22 +580,22 @@ const Visualizations = ({ isTabbed = false }) => {
             </div>
 
             {/* Visuals display */}
-            <div className="lg:col-span-3 flex flex-col justify-between space-y-6">
+            <div className="lg:col-span-3 flex flex-col justify-between space-y-5">
               <div className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black text-slate-200">
-                      Feature: <span className="text-indigo-400">{selectedCol}</span>
+                    <h3 className="text-sm font-bold text-slate-202">
+                      Feature: <span className="text-indigo-400 font-bold">{selectedCol}</span>
                     </h3>
                   </div>
                   
                   {/* Chart Switcher */}
                   <div className="flex items-center gap-2">
-                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Chart:</span>
+                    <span className="text-[9px] font-bold text-slate-550 uppercase tracking-wider">Chart:</span>
                     <select
                       value={selectedChartType}
                       onChange={e => setSelectedChartType(e.target.value)}
-                      className="bg-slate-950 border border-slate-850 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-350 focus:outline-none focus:border-indigo-500"
+                      className="bg-slate-950 border border-slate-900 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-350 focus:outline-none focus:border-indigo-500"
                     >
                       <option value="bar">Bar (Horizontal)</option>
                       <option value="column">Column (Vertical)</option>
@@ -636,21 +608,21 @@ const Visualizations = ({ isTabbed = false }) => {
 
                     <button
                       onClick={() => handleDownloadPNG('distribution-chart-container', `${selectedCol} Distribution`)}
-                      className="p-1.5 bg-slate-900 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-lg transition-all"
+                      className="p-1.5 bg-slate-950 border border-slate-900 hover:bg-slate-900 text-slate-400 hover:text-slate-200 rounded-lg transition-colors"
                       title="Download PNG"
                     >
-                      <Download size={13} />
+                      <Download size={12} />
                     </button>
                   </div>
                 </div>
 
                 {/* Recommendation Alert Box */}
                 {recommendation && (
-                  <div className="p-3 bg-indigo-500/[0.02] border border-indigo-500/10 rounded-xl flex items-start gap-2 text-[10px] text-indigo-300">
-                    <Brain size={14} className="text-indigo-400 mt-0.5 flex-shrink-0" />
+                  <div className="p-2.5 bg-indigo-500/[0.02] border border-indigo-500/10 rounded-lg flex items-start gap-2 text-[10px] text-indigo-300">
+                    <Brain size={12} className="text-indigo-400 mt-0.5 flex-shrink-0" />
                     <div>
-                      <span className="font-extrabold uppercase text-[8px] tracking-wide bg-indigo-500/15 px-1.5 py-0.5 rounded text-indigo-400 mr-1.5">AI Recommended Chart</span>
-                      <span className="font-bold text-slate-200 mr-1">{recommendation.text}:</span>
+                      <span className="font-bold uppercase text-[8px] tracking-wide bg-indigo-500/10 px-1.5 py-0.5 rounded text-indigo-400 mr-1.5">AI Suggestion</span>
+                      <span className="font-bold text-slate-202 mr-1">{recommendation.text}:</span>
                       <span>{recommendation.reason}</span>
                     </div>
                   </div>
@@ -658,33 +630,33 @@ const Visualizations = ({ isTabbed = false }) => {
 
                 {/* Summary boxes */}
                 {colSummary && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-3 bg-slate-900/25 border border-slate-900 rounded-xl text-[10px] font-semibold text-slate-450">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 p-3 bg-slate-955 border border-slate-900 rounded-lg text-[10px] font-semibold text-slate-450">
                     <div>
-                      <span className="text-slate-550 block uppercase tracking-wide">Missing Values</span>
+                      <span className="text-slate-550 block uppercase tracking-wider">Missing Values</span>
                       <span className="text-slate-300 font-mono font-bold mt-0.5 block">
                         {colSummary.missing_count} ({((colSummary.missing_count / (activeDataset.rowCount || 1)) * 100).toFixed(1)}%)
                       </span>
                     </div>
                     <div>
-                      <span className="text-slate-550 block uppercase tracking-wide">Unique Cards</span>
+                      <span className="text-slate-550 block uppercase tracking-wider">Unique Cards</span>
                       <span className="text-slate-300 font-mono font-bold mt-0.5 block">{colSummary.unique_count.toLocaleString()}</span>
                     </div>
                     {isNumericCol ? (
                       <>
                         <div>
-                          <span className="text-slate-550 block uppercase tracking-wide">Average Mean</span>
+                          <span className="text-slate-550 block uppercase tracking-wider">Mean Average</span>
                           <span className="text-indigo-300 font-mono font-bold mt-0.5 block">{colSummary.mean?.toFixed(2)}</span>
                         </div>
                         <div>
-                          <span className="text-slate-550 block uppercase tracking-wide">Standard Dev</span>
+                          <span className="text-slate-555 block uppercase tracking-wider">Std Deviation</span>
                           <span className="text-cyan-300 font-mono font-bold mt-0.5 block">{colSummary.std?.toFixed(2)}</span>
                         </div>
                       </>
                     ) : (
                       <div className="col-span-2">
-                        <span className="text-slate-550 block uppercase tracking-wide">Top Category</span>
-                        <span className="text-indigo-300 font-bold truncate mt-0.5 block max-w-[200px]" title={colSummary.top}>
-                          {colSummary.top || 'N/A'} ({colSummary.freq} counts)
+                        <span className="text-slate-550 block uppercase tracking-wider">Top Occurrence</span>
+                        <span className="text-indigo-305 font-bold truncate mt-0.5 block max-w-[200px]" title={colSummary.top}>
+                          {colSummary.top || 'N/A'} ({colSummary.freq} occurrences)
                         </span>
                       </div>
                     )}
@@ -692,20 +664,20 @@ const Visualizations = ({ isTabbed = false }) => {
                 )}
 
                 {/* Chart Box */}
-                <div id="distribution-chart-container" className="h-[280px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
+                <div id="distribution-chart-container" className="h-[240px] w-full bg-slate-955/20 p-2 rounded-lg border border-slate-900">
                   {renderActiveChart()}
                 </div>
               </div>
 
               {/* Dynamic Insights Section */}
-              <div className="space-y-2 border-t border-slate-900/60 pt-4">
-                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+              <div className="space-y-1.5 border-t border-slate-900 pt-3">
+                <h4 className="text-[9px] font-bold text-slate-550 uppercase tracking-wider flex items-center gap-1">
                   <Sparkles size={11} className="text-indigo-400" />
                   <span>Column Distribution Insights</span>
                 </h4>
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {columnInsights.map((insight, idx) => (
-                    <p key={idx} className="text-[11px] text-slate-350 leading-relaxed font-medium">
+                    <p key={idx} className="text-[10.5px] text-slate-350 leading-relaxed font-semibold">
                       {insight}
                     </p>
                   ))}
@@ -716,17 +688,17 @@ const Visualizations = ({ isTabbed = false }) => {
         )}
 
         {activeTab === 'correlation' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+          <div className="glass-card rounded-lg p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-200">Pearson Correlation Matrix</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Strength of linear relationships between numerical dimensions.</p>
+                <h3 className="text-sm font-bold text-slate-202">Pearson Correlation Matrix</h3>
+                <p className="text-[10.5px] text-slate-550 mt-0.5">Strength of linear relationships between numerical dimensions.</p>
               </div>
               <button
                 onClick={() => handleDownloadPNG('correlation-heatmap-container', 'Pearson Correlations')}
-                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
+                className="flex items-center gap-1.5 text-[9px] bg-slate-950 border border-slate-900 text-slate-450 font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-800 transition-colors self-start"
               >
-                <Download size={12} />
+                <Download size={11} />
                 <span>Download PNG</span>
               </button>
             </div>
@@ -738,23 +710,23 @@ const Visualizations = ({ isTabbed = false }) => {
         )}
 
         {activeTab === 'missing' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+          <div className="glass-card rounded-lg p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-200">Missing Values Summary</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Missing records counts and relative density ratios per column.</p>
+                <h3 className="text-sm font-bold text-slate-202">Missing Values Analysis</h3>
+                <p className="text-[10.5px] text-slate-550 mt-0.5">Missing record counts and relative density ratios per column.</p>
               </div>
               <button
                 onClick={() => handleDownloadPNG('missing-values-chart-wrapper', 'Missing Values Audit')}
-                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
+                className="flex items-center gap-1.5 text-[9px] bg-slate-950 border border-slate-900 text-slate-450 font-bold uppercase tracking-wider px-2 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-800 transition-colors self-start"
               >
-                <Download size={12} />
+                <Download size={11} />
                 <span>Download PNG</span>
               </button>
             </div>
 
             {missingAnalysis && Object.keys(missingAnalysis).length > 0 ? (
-              <div id="missing-values-chart-wrapper" className="h-[340px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
+              <div id="missing-values-chart-wrapper" className="h-[280px] w-full bg-slate-955/20 p-2 rounded-lg border border-slate-900">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart 
                     data={Object.entries(missingAnalysis).map(([col, info]) => ({
@@ -762,49 +734,49 @@ const Visualizations = ({ isTabbed = false }) => {
                       missingCount: info.count,
                       percentage: info.percentage
                     }))} 
-                    margin={{ top: 20, right: 10, left: -20, bottom: 20 }}
+                    margin={{ top: 20, right: 10, left: -25, bottom: 20 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="column" stroke="#64748b" fontSize={9} angle={-25} textAnchor="end" tickLine={false} />
-                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                    <XAxis dataKey="column" stroke="#52525b" fontSize={8} angle={-25} textAnchor="end" tickLine={false} />
+                    <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
-                      itemStyle={{ color: '#ef4444', fontWeight: 'bold' }}
+                      contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }}
+                      itemStyle={{ color: '#f87171', fontWeight: 'bold' }}
                     />
-                    <Bar dataKey="missingCount" fill="#ef4444" name="Null Count" radius={[4, 4, 0, 0]}>
+                    <Bar dataKey="missingCount" fill="#f87171" name="Null Count" radius={[2, 2, 0, 0]}>
                       {Object.entries(missingAnalysis).map(([col, info], index) => (
-                        <Cell key={`cell-${index}`} fill={info.count > 0 ? '#ef4444' : '#10b981'} />
+                        <Cell key={`cell-${index}`} fill={info.count > 0 ? '#f87171' : '#34d399'} />
                       ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-                <p className="text-slate-500 italic text-sm">No missing value summaries available.</p>
+              <div className="flex items-center justify-center p-8 bg-slate-955 border border-slate-900 rounded-lg min-h-[200px]">
+                <p className="text-slate-555 italic text-xs">No missing value summaries available.</p>
               </div>
             )}
           </div>
         )}
 
         {activeTab === 'outliers' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
-            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+          <div className="glass-card rounded-lg p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-200">Outlier Box Plot Ranges</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Box plots illustrating dataset values distribution ranges (Min, Q25, Median, Q75, Max).</p>
+                <h3 className="text-sm font-bold text-slate-202">Outliers Box Plot Distribution</h3>
+                <p className="text-[10.5px] text-slate-550 mt-0.5">Box plots illustrating dataset values distribution ranges (Min, Q25, Median, Q75, Max).</p>
               </div>
               <button
                 onClick={() => handleDownloadPNG('outliers-chart-wrapper', 'Outliers Box Ranges')}
-                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
+                className="flex items-center gap-1.5 text-[9px] bg-slate-950 border border-slate-900 text-slate-450 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-800 transition-colors self-start"
               >
-                <Download size={12} />
+                <Download size={11} />
                 <span>Download PNG</span>
               </button>
             </div>
 
             {outliersAnalysis && Object.keys(outliersAnalysis).length > 0 && Object.values(outliersAnalysis).some(o => o.count > 0) ? (
-              <div id="outliers-chart-wrapper" className="h-[360px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
+              <div id="outliers-chart-wrapper" className="h-[300px] w-full bg-slate-955/20 p-2 rounded-lg border border-slate-900">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart 
                     data={Object.entries(outliersAnalysis)
@@ -822,33 +794,33 @@ const Visualizations = ({ isTabbed = false }) => {
                         };
                       })
                     } 
-                    margin={{ top: 20, right: 10, left: -10, bottom: 20 }}
+                    margin={{ top: 20, right: 10, left: -25, bottom: 20 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="column" stroke="#64748b" fontSize={9} angle={-20} textAnchor="end" tickLine={false} />
-                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                    <XAxis dataKey="column" stroke="#52525b" fontSize={8} angle={-20} textAnchor="end" tickLine={false} />
+                    <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px', color: '#f8fafc' }}
+                      contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px', color: '#f4f4f5' }}
                       formatter={(value, name, props) => {
                         if (name === "Box Range") return [`${props.payload.q25.toFixed(2)} - ${props.payload.q75.toFixed(2)}`, "Q25-Q75 Box"];
                         return [value.toFixed(2), name];
                       }}
                     />
-                    <Legend wrapperStyle={{ fontSize: '10px' }} />
+                    <Legend wrapperStyle={{ fontSize: '9px' }} />
                     <Bar 
                       dataKey="q75" 
-                      fill="rgba(99, 102, 241, 0.25)" 
+                      fill="rgba(99, 102, 241, 0.15)" 
                       stroke="#6366f1"
                       strokeWidth={1}
                       name="Box Range"
-                      radius={2}
+                      radius={1}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="median" 
                       stroke="#06b6d4" 
-                      strokeWidth={2}
-                      dot={{ r: 4, stroke: '#06b6d4', strokeWidth: 1, fill: '#0b0f19' }}
+                      strokeWidth={1.5}
+                      dot={{ r: 3, stroke: '#06b6d4', strokeWidth: 1, fill: '#060608' }}
                       name="Median" 
                     />
                     <Line 
@@ -873,8 +845,8 @@ const Visualizations = ({ isTabbed = false }) => {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-                <p className="text-slate-500 italic text-sm">No numeric outlier distributions computed for this dataset.</p>
+              <div className="flex items-center justify-center p-8 bg-slate-955 border border-slate-900 rounded-lg min-h-[200px]">
+                <p className="text-slate-555 italic text-xs">No numerical column outlier distributions computed for this dataset.</p>
               </div>
             )}
           </div>

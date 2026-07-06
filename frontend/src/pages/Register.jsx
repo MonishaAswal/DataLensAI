@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { User, Mail, Lock, UserPlus, Database } from 'lucide-react';
+import { User, Mail, Lock, UserPlus, Activity } from 'lucide-react';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -49,36 +49,29 @@ const Register = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative px-4 bg-background">
-      {/* Background radial blurs */}
-      <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none"></div>
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none"></div>
-
-      <div className="w-full max-w-md glass-card rounded-2xl p-8 relative overflow-hidden shadow-2xl border border-slate-800/80">
-        {/* Top Gradient Stripe */}
-        <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-500"></div>
-
+      <div className="w-full max-w-md glass-card rounded-xl p-8 relative overflow-hidden">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-6">
-          <div className="bg-gradient-to-tr from-indigo-500 to-cyan-500 p-3 rounded-xl text-white shadow-xl shadow-indigo-500/15 mb-3">
-            <Database size={28} />
+          <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg text-white mb-3">
+            <Activity size={24} className="text-indigo-400" />
           </div>
-          <h2 className="text-2xl font-black text-slate-100 tracking-tight">Create Account</h2>
-          <p className="text-xs text-slate-500 mt-1 font-semibold uppercase tracking-wider">Join DataLens AI</p>
+          <h2 className="text-xl font-extrabold text-slate-101 tracking-tight">Create your account</h2>
+          <p className="text-[10px] text-slate-450 mt-1 font-bold uppercase tracking-widest">Get started with DataLens AI</p>
         </div>
 
         {/* Form Container */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-semibold">
+            <div className="p-3 bg-rose-500/10 border border-rose-500/25 text-rose-455 rounded-lg text-xs font-semibold">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Full Name</label>
+            <label className="block text-[9px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">Full Name</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
-                <User size={16} />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-550 pointer-events-none">
+                <User size={14} />
               </span>
               <input
                 type="text"
@@ -86,33 +79,33 @@ const Register = () => {
                 placeholder="John Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900/60 border border-slate-800 focus:border-indigo-500 text-sm text-slate-200 placeholder-slate-600 rounded-xl focus:outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-900 text-xs text-slate-101 placeholder-slate-550 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Email Address</label>
+            <label className="block text-[9px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">Email Address</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
-                <Mail size={16} />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-550 pointer-events-none">
+                <Mail size={14} />
               </span>
               <input
                 type="email"
                 required
-                placeholder="you@example.com"
+                placeholder="name@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900/60 border border-slate-800 focus:border-indigo-500 text-sm text-slate-200 placeholder-slate-600 rounded-xl focus:outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-900 text-xs text-slate-101 placeholder-slate-550 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Password</label>
+            <label className="block text-[9px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">Password</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
-                <Lock size={16} />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-550 pointer-events-none">
+                <Lock size={14} />
               </span>
               <input
                 type="password"
@@ -120,16 +113,16 @@ const Register = () => {
                 placeholder="Minimum 6 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900/60 border border-slate-800 focus:border-indigo-500 text-sm text-slate-200 placeholder-slate-600 rounded-xl focus:outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-900 text-xs text-slate-101 placeholder-slate-550 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Confirm Password</label>
+            <label className="block text-[9px] font-bold text-slate-455 uppercase tracking-wider mb-1.5">Confirm Password</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-500 pointer-events-none">
-                <Lock size={16} />
+              <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-550 pointer-events-none">
+                <Lock size={14} />
               </span>
               <input
                 type="password"
@@ -137,7 +130,7 @@ const Register = () => {
                 placeholder="Re-enter password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-900/60 border border-slate-800 focus:border-indigo-500 text-sm text-slate-200 placeholder-slate-600 rounded-xl focus:outline-none transition-all"
+                className="w-full pl-9 pr-4 py-2 bg-slate-950 border border-slate-900 text-xs text-slate-101 placeholder-slate-550 rounded-lg focus:outline-none focus:border-indigo-500 transition-colors"
               />
             </div>
           </div>
@@ -145,16 +138,16 @@ const Register = () => {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/25 active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none mt-4"
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors disabled:opacity-50 disabled:pointer-events-none mt-4"
           >
-            <UserPlus size={15} />
+            <UserPlus size={14} />
             <span>{isSubmitting ? 'Registering...' : 'Register'}</span>
           </button>
         </form>
 
         {/* Footer Link */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-slate-450">
             Already have an account?{' '}
             <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-bold transition-colors">
               Sign In

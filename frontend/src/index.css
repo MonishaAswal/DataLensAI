@@ -6,74 +6,93 @@
 
 @layer base {
   body {
-    @apply bg-background text-slate-100 font-sans antialiased overflow-x-hidden;
+    @apply bg-background text-slate-101 font-sans antialiased overflow-x-hidden;
+    /* Clean SaaS background mesh grid pattern */
     background-image: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.04) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.03) 0px, transparent 50%);
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.03) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.02) 0px, transparent 50%),
+      linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
     background-attachment: fixed;
   }
 }
 
-/* Custom scrollbars */
+/* Custom scrollbars - Minimalist Linear style */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(11, 15, 25, 0.5);
+  background: #060608;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.15);
-  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.1);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.25);
 }
 
-/* LangSmith / Databricks inspired crisp borders and flat developer theme styling */
+/* Premium Vercel/Linear-inspired Flat Cards */
 .glass-card {
-  background: #111827; /* Solid slate-900 background to avoid glowing AI-template blur look */
-  border: 1px solid #1f2937; /* Flat, crisp gray border */
-  border-radius: 12px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.glass-card-hover {
+  background: #09090b; /* Solid zinc-950 background */
+  border: 1px solid #18181b; /* Flat, thin zinc-900 border */
+  border-radius: 10px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.glass-card-hover:hover {
-  background: #111827;
-  border-color: #374151;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+.glass-card:hover {
+  border-color: #27272a; /* Glow/Highlight on hover (zinc-800) */
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
 }
 
-/* Custom Databricks-style badge styles */
+/* Flat Card without hover transitions */
+.static-card {
+  background: #09090b;
+  border: 1px solid #18181b;
+  border-radius: 10px;
+}
+
+/* Custom developer-oriented mini badges */
 .badge-indigo {
-  @apply bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase tracking-wider;
+  @apply bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
 .badge-cyan {
-  @apply bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase tracking-wider;
+  @apply bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
 .badge-emerald {
-  @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase tracking-wider;
+  @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
 .badge-rose {
-  @apply bg-rose-500/10 text-rose-400 border border-rose-500/20 px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase tracking-wider;
+  @apply bg-rose-500/10 text-rose-450 border border-rose-500/20 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
 .badge-slate {
-  @apply bg-slate-800/60 text-slate-400 border border-slate-700/50 px-2 py-0.5 rounded text-[10px] font-semibold font-mono uppercase tracking-wider;
+  @apply bg-slate-900/60 text-slate-450 border border-slate-800/80 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
-/* Shimmer animation for skeleton loads */
+/* SaaS Form Controls customization */
+input[type="text"], input[type="password"], input[type="email"], select, textarea {
+  @apply bg-slate-950 border border-slate-900 text-slate-101 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-550;
+}
+
+.btn-primary {
+  @apply bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider border border-indigo-500/10 active:scale-[0.98] transition-all;
+}
+
+.btn-secondary {
+  @apply bg-slate-950 hover:bg-slate-900 border border-slate-900 text-slate-350 rounded-lg text-xs font-bold uppercase tracking-wider active:scale-[0.98] transition-all;
+}
+
+/* Shimmer animation for skeleton loaders */
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -83,7 +102,7 @@
 .animate-shimmer {
   position: relative;
   overflow: hidden;
-  background-color: #1f2937;
+  background-color: #18181b;
 }
 
 .animate-shimmer::after {
@@ -97,9 +116,9 @@
     90deg,
     rgba(255, 255, 255, 0) 0%,
     rgba(255, 255, 255, 0.02) 20%,
-    rgba(255, 255, 255, 0.04) 60%,
+    rgba(255, 255, 255, 0.05) 60%,
     rgba(255, 255, 255, 0) 100%
   );
-  animation: shimmer 1.8s infinite;
+  animation: shimmer 2s infinite;
   content: '';
 }
