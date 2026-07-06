@@ -11,14 +11,19 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Edit2,
+  Check,
+  X
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { activeDataset } = useAuth();
+  const { activeDataset, setActiveDataset } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overviewData, setOverviewData] = useState(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [tempName, setTempName] = useState('');
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -92,6 +97,24 @@ const Dashboard = () => {
 
   const displayName = datasetName || originalName;
 
+  const handleRename = async () => {
+    if (!tempName.trim() || tempName === displayName) {
+      setIsRenaming(false);
+      return;
+    }
+    try {
+      setError('');
+      await datasetService.updateDataset(activeDataset._id || activeDataset.id, { datasetName: tempName.trim() });
+      const updated = { ...activeDataset, datasetName: tempName.trim() };
+      setActiveDataset(updated);
+      setOverviewData(prev => ({ ...prev, datasetName: tempName.trim() }));
+      setIsRenaming(false);
+    } catch (err) {
+      console.error('Failed to rename dataset:', err);
+      setError('Failed to rename dataset.');
+    }
+  };
+
   // Format uploaded time
   const uploadDate = new Date(createdAt).toLocaleDateString('en-US', {
     month: 'short',
@@ -107,10 +130,47 @@ const Dashboard = () => {
         {/* Header Title */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight">Dataset Overview</h2>
-            <p className="text-slate-400 text-sm mt-1">
-              General characteristics, column definitions, and raw previews of <span className="text-indigo-400 font-bold">{displayName}</span>.
-            </p>
+            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
+              <span>Dataset Overview</span>
+            </h2>
+            <div className="text-slate-400 text-sm mt-1 flex items-center gap-2 flex-wrap">
+              <span>General characteristics, columns, and previews of:</span>
+              {isRenaming ? (
+                <div className="flex items-center gap-2 bg-slate-900 px-2 py-1 rounded-lg border border-indigo-500/30">
+                  <input
+                    type="text"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    className="bg-transparent text-indigo-400 font-bold border-none outline-none text-xs w-48"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRename();
+                      if (e.key === 'Escape') setIsRenaming(false);
+                    }}
+                  />
+                  <button onClick={handleRename} className="text-emerald-400 hover:text-emerald-300">
+                    <Check size={14} />
+                  </button>
+                  <button onClick={() => setIsRenaming(false)} className="text-rose-400 hover:text-rose-350">
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-indigo-400 font-bold bg-indigo-500/10 px-2.5 py-0.5 rounded-lg border border-indigo-500/20">{displayName}</span>
+                  <button
+                    onClick={() => {
+                      setTempName(displayName);
+                      setIsRenaming(true);
+                    }}
+                    className="text-slate-500 hover:text-indigo-400 transition-colors p-1"
+                    title="Rename dataset"
+                  >
+                    <Edit2 size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center gap-2 bg-slate-900/60 px-4 py-2 border border-slate-800 rounded-xl">

@@ -13,14 +13,13 @@ def clean_dataset(file_path: str, output_path: str, options: dict) -> dict:
     
     actions_taken = []
     
-    # Pre-clean: Replace empty strings, whitespace-only entries, and text nulls with actual NaN
+    # 1. Pre-clean: Clean whitespace & detect text nulls in object columns without converting original NaNs to string
     for col in df.columns:
         if df[col].dtype == object:
-            # Replace whitespace-only strings
-            df[col] = df[col].astype(str).str.strip()
+            df[col] = df[col].apply(lambda x: str(x).strip() if pd.notna(x) and not isinstance(x, (int, float)) else x)
             df[col] = df[col].replace(['', 'null', 'NULL', 'None', 'none', 'NaN', 'nan', 'undefined', 'NA', '<NA>'], np.nan)
     
-    # 1. Remove duplicates
+    # 2. Remove duplicates (runs early so dups don't bias calculations)
     if options.get("remove_duplicates", False) or options.get("removeDuplicates", False):
         dup_count = int(df.duplicated().sum())
         if dup_count > 0:
@@ -29,69 +28,7 @@ def clean_dataset(file_path: str, output_path: str, options: dict) -> dict:
         else:
             actions_taken.append("No duplicate rows found.")
             
-    # 2. Convert columns to numeric if they are mostly numeric but typed as object
-    for col in df.columns:
-        if df[col].dtype == object:
-            non_null = df[col].dropna()
-            if not non_null.empty:
-                # Check if > 80% of non-null values can be converted to numeric
-                converted = pd.to_numeric(non_null, errors='coerce')
-                valid_numeric_pct = (converted.notna().sum() / len(non_null))
-                if valid_numeric_pct > 0.8:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    actions_taken.append(f"Coerced column '{col}' to numeric (detected numeric values).")
-
-    # 3. Fill missing numerical values
-    impute_numeric = options.get("impute_numeric", "none") or options.get("imputeNumeric", "none")
-    if impute_numeric in ["mean", "median"]:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        imputed_count = 0
-        for col in numeric_cols:
-            missing_count = int(df[col].isnull().sum())
-            if missing_count > 0:
-                if impute_numeric == "mean":
-                    fill_value = float(df[col].mean())
-                else:  # median
-                    fill_value = float(df[col].median())
-                
-                # In case the entire column was NaN
-                if pd.isna(fill_value):
-                    fill_value = 0.0
-                
-                df[col] = df[col].fillna(fill_value)
-                imputed_count += missing_count
-                actions_taken.append(f"Imputed {missing_count} nulls in numeric column '{col}' using {impute_numeric}.")
-        if imputed_count > 0:
-            actions_taken.append(f"Total numeric values imputed: {imputed_count}.")
-            
-    # 4. Fill missing categorical values
-    impute_categorical = options.get("impute_categorical", "none") or options.get("imputeCategorical", "none")
-    if impute_categorical == "mode":
-        categorical_cols = df.select_dtypes(include=[object, "category"]).columns
-        imputed_count = 0
-        for col in categorical_cols:
-            missing_count = int(df[col].isnull().sum())
-            if missing_count > 0:
-                mode_series = df[col].mode()
-                if not mode_series.empty:
-                    fill_value = mode_series.iloc[0]
-                else:
-                    fill_value = "Unknown"
-                
-                df[col] = df[col].fillna(fill_value)
-                imputed_count += missing_count
-                actions_taken.append(f"Imputed {missing_count} nulls in categorical column '{col}' using mode.")
-        if imputed_count > 0:
-            actions_taken.append(f"Total categorical values imputed: {imputed_count}.")
-            
-    # 5. Remove empty columns
-    if options.get("remove_empty_cols", False) or options.get("removeEmptyCols", False):
-        empty_cols = [col for col in df.columns if df[col].isnull().all()]
-        if empty_cols:
-            df = df.dropna(how='all', axis=1)
-            actions_taken.append(f"Removed {len(empty_cols)} completely empty column(s): {', '.join(empty_cols)}.")
-            
-    # 6. Standardize date formats
+    # 3. Standardize date formats BEFORE imputation (in case invalid dates fail parse and become NaT/NaN)
     if options.get("standardize_dates", False) or options.get("standardizeDates", False):
         object_cols = df.select_dtypes(include=[object]).columns
         standardized_cols = []
@@ -114,6 +51,7 @@ def clean_dataset(file_path: str, output_path: str, options: dict) -> dict:
             
             if is_date_named or (parse_success_count / len(non_null_samples) >= 0.6):
                 try:
+                    # Coerce errors to NaN/NaT so we can impute them later
                     converted = pd.to_datetime(df[col], errors='coerce')
                     if not converted.isnull().all():
                         df[col] = converted.dt.strftime('%Y-%m-%d')
@@ -122,6 +60,76 @@ def clean_dataset(file_path: str, output_path: str, options: dict) -> dict:
                     pass
         if standardized_cols:
             actions_taken.append(f"Standardized date formats to 'YYYY-MM-DD' for {len(standardized_cols)} column(s): {', '.join(standardized_cols)}.")
+
+    # 4. Convert object columns to numeric if mostly numeric (runs BEFORE imputation)
+    for col in df.columns:
+        if df[col].dtype == object:
+            non_null = df[col].dropna()
+            if not non_null.empty:
+                converted = pd.to_numeric(non_null, errors='coerce')
+                valid_numeric_pct = (converted.notna().sum() / len(non_null))
+                if valid_numeric_pct > 0.8:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    actions_taken.append(f"Coerced column '{col}' to numeric (detected numeric values).")
+
+    # 5. Remove empty columns
+    if options.get("remove_empty_cols", False) or options.get("removeEmptyCols", False):
+        empty_cols = [col for col in df.columns if df[col].isnull().all()]
+        if empty_cols:
+            df = df.dropna(how='all', axis=1)
+            actions_taken.append(f"Removed {len(empty_cols)} completely empty column(s): {', '.join(empty_cols)}.")
+
+    # 6. Fill missing numerical values (handles coerced numeric NaNs too!)
+    impute_numeric = options.get("impute_numeric", "none") or options.get("imputeNumeric", "none")
+    if impute_numeric in ["mean", "median"]:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        imputed_count = 0
+        for col in numeric_cols:
+            missing_count = int(df[col].isnull().sum())
+            if missing_count > 0:
+                if impute_numeric == "mean":
+                    fill_value = float(df[col].mean())
+                else:  # median
+                    fill_value = float(df[col].median())
+                
+                if pd.isna(fill_value):
+                    fill_value = 0.0
+                
+                df[col] = df[col].fillna(fill_value)
+                imputed_count += missing_count
+                actions_taken.append(f"Imputed {missing_count} nulls in numeric column '{col}' using {impute_numeric}.")
+        if imputed_count > 0:
+            actions_taken.append(f"Total numeric values imputed: {imputed_count}.")
+            
+    # 7. Fill missing categorical values (handles coerced date NaNs too!)
+    impute_categorical = options.get("impute_categorical", "none") or options.get("imputeCategorical", "none")
+    if impute_categorical == "mode":
+        categorical_cols = df.select_dtypes(include=[object, "category"]).columns
+        imputed_count = 0
+        for col in categorical_cols:
+            missing_count = int(df[col].isnull().sum())
+            if missing_count > 0:
+                mode_series = df[col].mode()
+                if not mode_series.empty:
+                    fill_value = mode_series.iloc[0]
+                else:
+                    fill_value = "Unknown"
+                
+                df[col] = df[col].fillna(fill_value)
+                imputed_count += missing_count
+                actions_taken.append(f"Imputed {missing_count} nulls in categorical column '{col}' using mode.")
+        if imputed_count > 0:
+            actions_taken.append(f"Total categorical values imputed: {imputed_count}.")
+
+    # 8. Final Sanitization Fallback: ensure no dangling NaN/NaT values exist anywhere
+    for col in df.columns:
+        missing_count = int(df[col].isnull().sum())
+        if missing_count > 0:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = df[col].fillna(0.0)
+            else:
+                df[col] = df[col].fillna("Unknown")
+            actions_taken.append(f"Swept {missing_count} remaining unhandled nulls in '{col}' to fallbacks.")
 
     # Save to target file
     _, ext = os.path.splitext(output_path.lower())

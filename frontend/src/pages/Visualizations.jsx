@@ -368,6 +368,74 @@ const Visualizations = () => {
             </BarChart>
           </ResponsiveContainer>
         );
+      case 'boxplot':
+        if (!colSummary || colSummary.min === undefined || colSummary.min === null) {
+          return (
+            <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
+              <p className="text-slate-500 italic text-sm">Box Plot is only available for numerical columns.</p>
+            </div>
+          );
+        }
+        const minVal = colSummary.min;
+        const q25Val = colSummary.q25 ?? colSummary.min;
+        const medVal = colSummary.median ?? colSummary.mean;
+        const q75Val = colSummary.q75 ?? colSummary.max;
+        const maxVal = colSummary.max;
+        const rangeVal = maxVal - minVal || 1;
+        const getPctVal = (val) => ((val - minVal) / rangeVal) * 100;
+        
+        return (
+          <div className="flex flex-col items-center justify-center p-6 w-full h-full min-h-[260px] text-slate-200">
+            <div className="relative w-full max-w-md h-20 flex items-center px-4 bg-slate-900/50 rounded-xl border border-slate-800">
+              {/* Whiskers line */}
+              <div className="absolute left-[10%] right-[10%] h-0.5 bg-slate-700"></div>
+              
+              {/* Left whisker cap */}
+              <div className="absolute left-[10%] h-6 w-0.5 bg-slate-500"></div>
+              
+              {/* Right whisker cap */}
+              <div className="absolute right-[10%] h-6 w-0.5 bg-slate-500"></div>
+              
+              {/* Box (IQR) */}
+              <div 
+                className="absolute h-10 bg-indigo-500/20 border border-indigo-500 rounded flex items-center"
+                style={{
+                  left: `${10 + getPctVal(q25Val) * 0.8}%`,
+                  width: `${Math.max(1, getPctVal(q75Val - q25Val) * 0.8)}%`
+                }}
+              >
+                {/* Median line */}
+                <div 
+                  className="absolute top-0 bottom-0 w-0.5 bg-cyan-400"
+                  style={{ left: `${((medVal - q25Val) / (q75Val - q25Val || 1)) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-5 gap-2 w-full max-w-md mt-6 text-center text-[10px] font-mono font-bold text-slate-400">
+              <div>
+                <span className="block text-slate-500 text-[8px] uppercase mb-1">Min</span>
+                <span>{minVal.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="block text-indigo-400 text-[8px] uppercase mb-1">Q1 (25%)</span>
+                <span>{q25Val.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="block text-cyan-400 text-[8px] uppercase mb-1">Median</span>
+                <span>{medVal.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="block text-indigo-400 text-[8px] uppercase mb-1">Q3 (75%)</span>
+                <span>{q75Val.toFixed(2)}</span>
+              </div>
+              <div>
+                <span className="block text-slate-500 text-[8px] uppercase mb-1">Max</span>
+                <span>{maxVal.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        );
       case 'column':
       case 'histogram':
       default:
@@ -556,6 +624,7 @@ const Visualizations = () => {
                       <option value="line">Line Chart</option>
                       <option value="area">Area Chart</option>
                       <option value="scatter">Scatter Plot</option>
+                      <option value="boxplot">Box Plot</option>
                     </select>
 
                     <button

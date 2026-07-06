@@ -177,10 +177,10 @@ def analyze_dataset(file_path: str) -> dict:
                 
         column_summaries[col] = summary
 
-    # Data Quality Checks (Detect missing, duplicates, constant columns, high cardinality, high correlation, imbalance)
+    # Data Quality Checks (Detect missing, duplicates, constant columns, high cardinality, high correlation, imbalance, suspicious cols, formatting inconsistency)
     data_quality_issues = []
     
-    # Constant columns: column with only 1 unique value
+    # 1. Constant columns: column with only 1 unique value
     constant_cols_count = 0
     for col, u_cnt in unique_counts.items():
         if u_cnt == 1 and row_count > 1:
@@ -192,7 +192,7 @@ def analyze_dataset(file_path: str) -> dict:
                 "severity": "low"
             })
             
-    # High cardinality: categorical column with more than 50% unique values and count > 10
+    # 2. High cardinality: categorical column with more than 50% unique values and count > 10
     high_cardinality_count = 0
     for col in df.columns:
         if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
@@ -206,7 +206,7 @@ def analyze_dataset(file_path: str) -> dict:
                     "severity": "low"
                 })
                 
-    # Outliers
+    # 3. Outliers
     total_outliers = 0
     numeric_columns_count = 0
     for col, o_info in outliers_analysis.items():
@@ -220,20 +220,59 @@ def analyze_dataset(file_path: str) -> dict:
                 "severity": "medium" if o_info["percentage"] > 5 else "low"
             })
             
-    # Missing values check
+    # 4. Missing values check & High Null Column Check
     total_missing = 0
+    high_null_cols_count = 0
     for col, m_info in missing_analysis.items():
         total_missing += m_info["count"]
         if m_info["count"] > 0:
-            severity = "high" if m_info["percentage"] > 20 else ("medium" if m_info["percentage"] > 5 else "low")
+            if m_info["percentage"] > 50:
+                high_null_cols_count += 1
+                severity = "high"
+                issue_type = f"Critically High Null Percentage ({m_info['percentage']}%)"
+            else:
+                severity = "medium" if m_info["percentage"] > 5 else "low"
+                issue_type = f"Missing Values ({m_info['count']} values)"
+                
             data_quality_issues.append({
                 "column": col,
-                "issue": f"Missing Values ({m_info['count']} values)",
+                "issue": issue_type,
                 "description": f"{m_info['count']} records ({m_info['percentage']}%) contain empty or null values.",
                 "severity": severity
             })
 
-    # Numeric Correlation Matrix & Highly Correlated Check
+    # 5. Suspicious / Unnamed / Temporary Columns
+    suspicious_cols_count = 0
+    for col in df.columns:
+        col_lower = str(col).lower()
+        if "unnamed" in col_lower or "temp" in col_lower or "test" in col_lower or col_lower.strip() == "" or col_lower.startswith("col_"):
+            suspicious_cols_count += 1
+            data_quality_issues.append({
+                "column": str(col),
+                "issue": "Suspicious Column Name",
+                "description": f"Column header '{col}' seems placeholder or temporary.",
+                "severity": "low"
+            })
+
+    # 6. Formatting / Casing Inconsistencies
+    formatting_inconsistent_count = 0
+    for col in df.columns:
+        if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
+            non_null = df[col].dropna()
+            if not non_null.empty:
+                # Check for casing inconsistencies (e.g. 'male', 'Male', 'MALE')
+                unique_vals = non_null.unique()
+                unique_lowered = set(str(v).lower().strip() for v in unique_vals)
+                if len(unique_vals) > len(unique_lowered):
+                    formatting_inconsistent_count += 1
+                    data_quality_issues.append({
+                        "column": col,
+                        "issue": "Inconsistent Categorical Formatting",
+                        "description": "Column contains duplicate categories with different casing or leading/trailing spaces.",
+                        "severity": "medium"
+                    })
+
+    # 7. Numeric Correlation Matrix & Highly Correlated Check
     numeric_cols = list(df.select_dtypes(include=[np.number]).columns)
     correlation_matrix = {}
     highly_correlated_pairs = []
@@ -257,7 +296,7 @@ def analyze_dataset(file_path: str) -> dict:
                         "severity": "low"
                     })
 
-    # Imbalance check for categorical columns
+    # 8. Imbalance check for categorical columns
     class_imbalances_count = 0
     for col in df.columns:
         if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
@@ -273,7 +312,7 @@ def analyze_dataset(file_path: str) -> dict:
                         "severity": "medium"
                     })
 
-    # Invalid dates check: date keyword columns that fail parsing
+    # 9. Invalid dates check: date keyword columns that fail parsing
     invalid_dates_count = 0
     for col in df.columns:
         name_lower = col.lower()
@@ -298,20 +337,22 @@ def analyze_dataset(file_path: str) -> dict:
     # DYNAMIC QUALITY SCORE COMPUTATION
     total_cells = row_count * col_count if row_count > 0 and col_count > 0 else 1
     missing_pct = (total_missing / total_cells) * 100
-    missing_penalty = min(40.0, (missing_pct * 1.5)) # Up to -40
+    missing_penalty = min(35.0, (missing_pct * 1.5)) # Up to -35
     
     dup_pct = (duplicate_count / row_count) * 100 if row_count > 0 else 0
-    duplicate_penalty = min(20.0, (dup_pct * 1.0)) # Up to -20
+    duplicate_penalty = min(15.0, (dup_pct * 1.0)) # Up to -15
     
     outlier_pct = (total_outliers / total_cells) * 100
-    outliers_penalty = min(20.0, (outlier_pct * 2.0)) # Up to -20
+    outliers_penalty = min(15.0, (outlier_pct * 2.0)) # Up to -15
     
-    constant_penalty = min(15.0, constant_cols_count * 5.0)
-    cardinality_penalty = min(10.0, high_cardinality_count * 2.0)
-    correlation_penalty = min(10.0, len(highly_correlated_pairs) * 1.0)
-    imbalance_penalty = min(10.0, (class_imbalances_count + invalid_dates_count) * 2.0)
+    constant_penalty = min(10.0, constant_cols_count * 4.0)
+    cardinality_penalty = min(8.0, high_cardinality_count * 1.5)
+    correlation_penalty = min(8.0, len(highly_correlated_pairs) * 1.0)
+    imbalance_penalty = min(8.0, (class_imbalances_count + invalid_dates_count) * 2.0)
+    suspicious_penalty = min(6.0, suspicious_cols_count * 2.0)
+    formatting_penalty = min(6.0, formatting_inconsistent_count * 2.0)
     
-    raw_score = 100.0 - (missing_penalty + duplicate_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty)
+    raw_score = 100.0 - (missing_penalty + duplicate_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty + suspicious_penalty + formatting_penalty)
     quality_score = max(0, min(100, int(raw_score)))
     
     quality_score_breakdown = {
@@ -322,7 +363,9 @@ def analyze_dataset(file_path: str) -> dict:
         "constant_columns_penalty": float(round(constant_penalty, 2)),
         "cardinality_penalty": float(round(cardinality_penalty, 2)),
         "correlation_penalty": float(round(correlation_penalty, 2)),
-        "imbalance_penalty": float(round(imbalance_penalty, 2))
+        "imbalance_penalty": float(round(imbalance_penalty, 2)),
+        "suspicious_columns_penalty": float(round(suspicious_penalty, 2)),
+        "formatting_penalty": float(round(formatting_penalty, 2))
     }
 
     # Row previews (First 20 rows, clean NaN to None so it can serialize to JSON)

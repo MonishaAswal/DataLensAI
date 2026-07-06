@@ -30,6 +30,21 @@ export const AuthProvider = ({ children }) => {
             } catch (e) {
               console.error('Failed to parse active dataset from session:', e);
             }
+          } else {
+            try {
+              const datasets = await datasetService.getDatasets();
+              if (datasets && datasets.length > 0) {
+                const mostRecent = {
+                  id: datasets[0]._id || datasets[0].id,
+                  _id: datasets[0]._id || datasets[0].id,
+                  ...datasets[0]
+                };
+                setActiveDatasetState(mostRecent);
+                sessionStorage.setItem('activeDataset', JSON.stringify(mostRecent));
+              }
+            } catch (err) {
+              console.warn('Auto-loading most recent dataset failed:', err.message);
+            }
           }
         } catch (error) {
           console.error('Session validation failed:', error);
@@ -55,6 +70,23 @@ export const AuthProvider = ({ children }) => {
     };
     localStorage.setItem('token', responseData.token);
     setUser(activeUser);
+    
+    // Auto-load most recent dataset on login
+    try {
+      const datasets = await datasetService.getDatasets();
+      if (datasets && datasets.length > 0) {
+        const mostRecent = {
+          id: datasets[0]._id || datasets[0].id,
+          _id: datasets[0]._id || datasets[0].id,
+          ...datasets[0]
+        };
+        setActiveDatasetState(mostRecent);
+        sessionStorage.setItem('activeDataset', JSON.stringify(mostRecent));
+      }
+    } catch (err) {
+      console.warn('Auto-loading most recent dataset on login failed:', err.message);
+    }
+    
     return activeUser;
   };
 

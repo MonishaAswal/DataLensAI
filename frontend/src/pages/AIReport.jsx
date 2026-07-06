@@ -120,7 +120,8 @@ const AIReport = () => {
       if (!trimmed) return;
       
       const lines = trimmed.split('\n');
-      const title = lines[0].replace(/[:#]/g, '').trim();
+      let title = lines[0].replace(/[:#*]/g, '').trim();
+      title = title.replace(/^\d+[\.\-\s]*/, '').trim(); // Clean numeric prefixes like '1. '
       const body = lines.slice(1).join('\n').trim();
       
       if (title && body) {
