@@ -85,7 +85,7 @@ def analyze_dataset(file_path: str) -> dict:
         col_type = dtypes_dict[col]
         
         # Determine if numeric
-        is_numeric = np.issubdtype(col_data.dtype, np.number)
+        is_numeric = pd.api.types.is_numeric_dtype(col_data)
         
         summary = {
             "type": "numeric" if is_numeric else "categorical",
@@ -123,7 +123,7 @@ def analyze_dataset(file_path: str) -> dict:
                     "percentage": outlier_percentage,
                     "lower_bound": float(lower_bound),
                     "upper_bound": float(upper_bound),
-                    "outlier_samples": [float(val) for val in outliers.head(5).values]
+                    "outlier_samples": [float(val) for val in list(outliers[:5])]
                 }
                 
                 # Histogram distribution
@@ -238,11 +238,11 @@ def analyze_dataset(file_path: str) -> dict:
     correlation_matrix = {}
     highly_correlated_pairs = []
     if len(numeric_cols) > 1:
-        corr_matrix = pd.DataFrame.corr(df[numeric_cols])
-        if isinstance(corr_matrix, pd.DataFrame):
-            corr = corr_matrix.fillna(0)
+        df_numeric = df[numeric_cols]
+        if isinstance(df_numeric, pd.DataFrame):
+            corr = df_numeric.corr().fillna(0)
         else:
-            corr = pd.DataFrame(0.0, index=numeric_cols, columns=numeric_cols)
+            corr = pd.DataFrame(0.0, index=pd.Index(numeric_cols), columns=pd.Index(numeric_cols))
         for col1 in corr.columns:
             correlation_matrix[col1] = {}
             for col2 in corr.index:

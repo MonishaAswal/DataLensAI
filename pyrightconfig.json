@@ -1,6 +1,7 @@
 {
-  "venvPath": ".",
+  "venvPath": "./python-service",
   "venv": "venv",
+  "typeCheckingMode": "off",
   "extraPaths": [
     ".",
     "./python-service",
