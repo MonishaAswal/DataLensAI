@@ -58,7 +58,7 @@ const Sidebar = () => {
               <FileSpreadsheet size={18} />
             </div>
             <div className="overflow-hidden">
-              <p className="text-sm font-semibold truncate text-slate-200">{activeDataset.fileName || activeDataset.originalName}</p>
+              <p className="text-sm font-semibold truncate text-slate-200">{activeDataset.datasetName || activeDataset.fileName || activeDataset.originalName}</p>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${activeDataset.status === 'cleaned' ? 'bg-emerald-500' : 'bg-indigo-500 animate-pulse'}`}></span>
                 <span className="text-[10px] text-slate-400 capitalize font-medium">{activeDataset.status}</span>

@@ -11,6 +11,10 @@ const datasetSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    datasetName: {
+      type: String,
+      default: '',
+    },
     filename: {
       type: String,
       required: true,

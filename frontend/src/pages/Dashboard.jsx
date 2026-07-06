@@ -76,17 +76,21 @@ const Dashboard = () => {
 
   const {
     originalName,
+    datasetName,
     rowCount,
     columnCount,
     size,
     duplicateCount,
     missingValueCount,
     qualityScore,
+    qualityScoreBreakdown,
     columns,
     previewRows,
     cleaningActions,
     createdAt
   } = overviewData;
+
+  const displayName = datasetName || originalName;
 
   // Format uploaded time
   const uploadDate = new Date(createdAt).toLocaleDateString('en-US', {
@@ -105,7 +109,7 @@ const Dashboard = () => {
           <div>
             <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight">Dataset Overview</h2>
             <p className="text-slate-400 text-sm mt-1">
-              General characteristics, column definitions, and raw previews of <span className="text-indigo-400 font-bold">{originalName}</span>.
+              General characteristics, column definitions, and raw previews of <span className="text-indigo-400 font-bold">{displayName}</span>.
             </p>
           </div>
           
@@ -124,6 +128,50 @@ const Dashboard = () => {
             )}
           </div>
         </div>
+
+        {/* Quality Score Breakdown Detail */}
+        {qualityScoreBreakdown && Object.keys(qualityScoreBreakdown).length > 0 && (
+          <div className="glass-card rounded-2xl p-5 border border-slate-850 bg-slate-950/20 space-y-3.5 shadow-md">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-350">Data Quality Score Breakdown</h3>
+              <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wide">Final score: {qualityScore}/100</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 block uppercase tracking-wider mb-1">Base</span>
+                <span className="font-mono text-xs font-bold text-slate-300">100.0</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 block uppercase tracking-wider mb-1">Nulls</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.missing_values_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 block uppercase tracking-wider mb-1">Dups</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.duplicates_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-500 block uppercase tracking-wider mb-1">Outliers</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.outliers_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-550 block uppercase tracking-wider mb-1">Constants</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.constant_columns_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-550 block uppercase tracking-wider mb-1">Cardinality</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.cardinality_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-550 block uppercase tracking-wider mb-1">Correlations</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.correlation_penalty || 0}</span>
+              </div>
+              <div className="p-3 bg-slate-900/40 border border-slate-850/60 rounded-xl text-center">
+                <span className="text-[9px] text-slate-550 block uppercase tracking-wider mb-1">Imbalance</span>
+                <span className="font-mono text-xs font-bold text-rose-400">-{qualityScoreBreakdown.imbalance_penalty || 0}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Overview StatCards Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">

@@ -39,6 +39,7 @@ export const uploadDataset = async (req, res) => {
     const dataset = await Dataset.create({
       userId: req.user._id,
       originalName,
+      datasetName: originalName,
       filename: req.file.filename,
       filePath: filePath,
       size,

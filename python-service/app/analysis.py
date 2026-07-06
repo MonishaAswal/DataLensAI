@@ -177,12 +177,14 @@ def analyze_dataset(file_path: str) -> dict:
                 
         column_summaries[col] = summary
 
-    # Data Quality Checks (Detect missing, duplicates, constant columns, high cardinality)
+    # Data Quality Checks (Detect missing, duplicates, constant columns, high cardinality, high correlation, imbalance)
     data_quality_issues = []
     
     # Constant columns: column with only 1 unique value
+    constant_cols_count = 0
     for col, u_cnt in unique_counts.items():
         if u_cnt == 1 and row_count > 1:
+            constant_cols_count += 1
             data_quality_issues.append({
                 "column": col,
                 "issue": "Constant Column",
@@ -191,10 +193,12 @@ def analyze_dataset(file_path: str) -> dict:
             })
             
     # High cardinality: categorical column with more than 50% unique values and count > 10
+    high_cardinality_count = 0
     for col in df.columns:
         if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
             u_cnt = unique_counts[col]
             if u_cnt > 10 and (u_cnt / row_count) > 0.5:
+                high_cardinality_count += 1
                 data_quality_issues.append({
                     "column": col,
                     "issue": "High Cardinality",
@@ -203,8 +207,12 @@ def analyze_dataset(file_path: str) -> dict:
                 })
                 
     # Outliers
+    total_outliers = 0
+    numeric_columns_count = 0
     for col, o_info in outliers_analysis.items():
+        numeric_columns_count += 1
         if o_info["count"] > 0:
+            total_outliers += o_info["count"]
             data_quality_issues.append({
                 "column": col,
                 "issue": f"Outliers Detected ({o_info['count']} values)",
@@ -213,7 +221,9 @@ def analyze_dataset(file_path: str) -> dict:
             })
             
     # Missing values check
+    total_missing = 0
     for col, m_info in missing_analysis.items():
+        total_missing += m_info["count"]
         if m_info["count"] > 0:
             severity = "high" if m_info["percentage"] > 20 else ("medium" if m_info["percentage"] > 5 else "low")
             data_quality_issues.append({
@@ -223,18 +233,93 @@ def analyze_dataset(file_path: str) -> dict:
                 "severity": severity
             })
 
-    # Numeric Correlation Matrix
+    # Numeric Correlation Matrix & Highly Correlated Check
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     correlation_matrix = {}
+    highly_correlated_pairs = []
     if len(numeric_cols) > 1:
-        corr = df[numeric_cols].corr()
-        # Fill NaN correlations with 0
-        corr = corr.fillna(0)
-        # Convert matrix to structured dictionary
+        corr = df[numeric_cols].corr().fillna(0)
         for col1 in corr.columns:
             correlation_matrix[col1] = {}
             for col2 in corr.index:
-                correlation_matrix[col1][col2] = float(corr.loc[col1, col2])
+                val = float(corr.loc[col1, col2])
+                correlation_matrix[col1][col2] = val
+                if col1 < col2 and abs(val) > 0.85:
+                    highly_correlated_pairs.append((col1, col2, val))
+                    data_quality_issues.append({
+                        "column": f"{col1} & {col2}",
+                        "issue": "High Correlation",
+                        "description": f"Columns are highly correlated (r = {round(val, 2)}), which might cause multi-collinearity issues.",
+                        "severity": "low"
+                    })
+
+    # Imbalance check for categorical columns
+    class_imbalances_count = 0
+    for col in df.columns:
+        if dtypes_dict[col] == 'object' or dtypes_dict[col] == 'category':
+            non_null = df[col].dropna()
+            if not non_null.empty:
+                freqs = non_null.value_counts(normalize=True)
+                if freqs.iloc[0] > 0.85:
+                    class_imbalances_count += 1
+                    data_quality_issues.append({
+                        "column": col,
+                        "issue": "Data Imbalance",
+                        "description": f"A single value '{freqs.index[0]}' dominates {round(freqs.iloc[0]*100, 1)}% of the column.",
+                        "severity": "medium"
+                    })
+
+    # Invalid dates check: date keyword columns that fail parsing
+    invalid_dates_count = 0
+    for col in df.columns:
+        name_lower = col.lower()
+        date_keywords = ["date", "time", "created", "updated", "dob", "birth"]
+        if any(kw in name_lower for kw in date_keywords) and dtypes_dict[col] == 'object':
+            non_null = df[col].dropna()
+            if not non_null.empty:
+                try:
+                    parsed = pd.to_datetime(non_null, errors='coerce')
+                    nat_pct = (parsed.isna().sum() / len(non_null)) * 100
+                    if nat_pct > 15:
+                        invalid_dates_count += 1
+                        data_quality_issues.append({
+                            "column": col,
+                            "issue": "Invalid/Inconsistent Dates",
+                            "description": f"{round(nat_pct, 1)}% of non-null values failed to parse as date/time formats.",
+                            "severity": "medium"
+                        })
+                except Exception:
+                    pass
+
+    # DYNAMIC QUALITY SCORE COMPUTATION
+    total_cells = row_count * col_count if row_count > 0 and col_count > 0 else 1
+    missing_pct = (total_missing / total_cells) * 100
+    missing_penalty = min(40.0, (missing_pct * 1.5)) # Up to -40
+    
+    dup_pct = (duplicate_count / row_count) * 100 if row_count > 0 else 0
+    duplicate_penalty = min(20.0, (dup_pct * 1.0)) # Up to -20
+    
+    outlier_pct = (total_outliers / total_cells) * 100
+    outliers_penalty = min(20.0, (outlier_pct * 2.0)) # Up to -20
+    
+    constant_penalty = min(15.0, constant_cols_count * 5.0)
+    cardinality_penalty = min(10.0, high_cardinality_count * 2.0)
+    correlation_penalty = min(10.0, len(highly_correlated_pairs) * 1.0)
+    imbalance_penalty = min(10.0, (class_imbalances_count + invalid_dates_count) * 2.0)
+    
+    raw_score = 100.0 - (missing_penalty + duplicate_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty)
+    quality_score = max(0, min(100, int(raw_score)))
+    
+    quality_score_breakdown = {
+        "score": quality_score,
+        "missing_values_penalty": float(round(missing_penalty, 2)),
+        "duplicates_penalty": float(round(duplicate_penalty, 2)),
+        "outliers_penalty": float(round(outliers_penalty, 2)),
+        "constant_columns_penalty": float(round(constant_penalty, 2)),
+        "cardinality_penalty": float(round(cardinality_penalty, 2)),
+        "correlation_penalty": float(round(correlation_penalty, 2)),
+        "imbalance_penalty": float(round(imbalance_penalty, 2))
+    }
 
     # Row previews (First 20 rows, clean NaN to None so it can serialize to JSON)
     preview_df = df.head(20)
@@ -258,5 +343,7 @@ def analyze_dataset(file_path: str) -> dict:
         "distributions": distributions,
         "correlation_matrix": correlation_matrix,
         "data_quality_issues": data_quality_issues,
-        "preview_rows": preview_rows
+        "preview_rows": preview_rows,
+        "quality_score": quality_score,
+        "quality_score_breakdown": quality_score_breakdown
     }

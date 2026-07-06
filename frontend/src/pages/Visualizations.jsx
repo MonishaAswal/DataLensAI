@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { datasetService } from '../services/api';
+import { datasetService, historyService } from '../services/api';
 import Layout from '../components/Layout';
 
 import CorrelationHeatmap from '../components/CorrelationHeatmap';
@@ -15,29 +15,40 @@ import {
   ComposedChart,
   Line,
   CartesianGrid,
-  Legend
+  Legend,
+  PieChart,
+  Pie,
+  AreaChart,
+  Area,
+  ScatterChart,
+  Scatter
 } from 'recharts';
 import { 
   BarChart3, 
-  ScatterChart, 
+  ScatterChart as ScatterIcon, 
   Compass, 
   Info, 
   Download, 
   AlertTriangle,
   Loader2,
   ListMinus,
-  TrendingDown
+  TrendingDown,
+  LineChart,
+  PieChart as PieIcon,
+  Sparkles,
+  HelpCircle,
+  TrendingUp,
+  Brain
 } from 'lucide-react';
 
 const Visualizations = () => {
   const { activeDataset, user } = useAuth();
   const [activeTab, setActiveTab] = useState('distribution'); // 'distribution', 'correlation', 'missing', 'outliers'
   const [selectedCol, setSelectedCol] = useState('');
+  const [selectedChartType, setSelectedChartType] = useState('bar');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [visualizationData, setVisualizationData] = useState(null);
-
-  const chartRef = useRef(null);
 
   // Fetch visualizations statistics on mount
   useEffect(() => {
@@ -63,19 +74,17 @@ const Visualizations = () => {
         };
         setVisualizationData(data);
 
-        // Save a record into Firestore analysisHistory
+        // Save history log
         if (user) {
           try {
-            await addDoc(collection(db, 'analysisHistory'), {
-              userId: user.uid,
+            await historyService.createHistory({
               datasetId: activeDataset.id || activeDataset._id,
-              datasetName: activeDataset.fileName || activeDataset.originalName || 'dataset.csv',
+              datasetName: activeDataset.datasetName || activeDataset.originalName || 'dataset.csv',
               operationType: 'Visualization Generation',
-              createdAt: new Date().toISOString(),
               report: 'Generated and viewed category distributions and Pearson correlation matrix.'
             });
           } catch (dbErr) {
-            console.warn('Logging visualization operation to history failed:', dbErr);
+            console.warn('Logging visualization operation to history failed:', dbErr.message);
           }
         }
 
@@ -90,8 +99,6 @@ const Visualizations = () => {
     loadVisualizations();
   }, [activeDataset, user]);
 
-
-  // Set default selected column
   const columns = activeDataset?.columns || [];
   useEffect(() => {
     if (columns.length > 0 && !selectedCol) {
@@ -104,7 +111,100 @@ const Visualizations = () => {
     return col ? col.type : '';
   }, [columns, selectedCol]);
 
-  // Download chart as PNG
+  const distInfo = useMemo(() => {
+    if (!visualizationData || !selectedCol) return null;
+    return visualizationData.distributions?.[selectedCol];
+  }, [visualizationData, selectedCol]);
+
+  const colSummary = useMemo(() => {
+    if (!activeDataset || !selectedCol) return null;
+    return activeDataset.edaResults?.column_summaries?.[selectedCol];
+  }, [activeDataset, selectedCol]);
+
+  const isNumericCol = useMemo(() => {
+    return distInfo?.type === 'numeric';
+  }, [distInfo]);
+
+  // Dynamic Chart Recommendation Engine
+  const recommendation = useMemo(() => {
+    if (!colSummary || !distInfo) return { type: 'bar', text: 'Bar Chart' };
+    const unique = colSummary.unique_count;
+    
+    if (isNumericCol) {
+      if (unique > 15) {
+        return { 
+          type: 'histogram', 
+          text: 'Histogram', 
+          reason: 'Continuous numeric column with high cardinality. Histogram best details frequencies across value ranges.' 
+        };
+      }
+      return { 
+        type: 'column', 
+        text: 'Column Chart', 
+        reason: 'Discrete numerical column with few values. Column chart compares values side by side.' 
+      };
+    } else {
+      if (unique > 0 && unique <= 6) {
+        return { 
+          type: 'pie', 
+          text: 'Pie Chart', 
+          reason: 'Categorical column with low cardinality. Pie chart effectively shows relative proportions.' 
+        };
+      }
+      return { 
+        type: 'bar', 
+        text: 'Bar Chart', 
+        reason: 'Categorical text column. Horizontal bar chart allows clean rendering of category labels.' 
+      };
+    }
+  }, [colSummary, distInfo, isNumericCol]);
+
+  // Set chart type automatically when column changes
+  useEffect(() => {
+    if (recommendation) {
+      setSelectedChartType(recommendation.type);
+    }
+  }, [selectedCol, recommendation]);
+
+  // Dynamic Text Insights Generator
+  const columnInsights = useMemo(() => {
+    if (!colSummary || !activeDataset) return '';
+    const insights = [];
+    const missingPct = ((colSummary.missing_count / (activeDataset.rowCount || 1)) * 100).toFixed(1);
+    
+    if (parseFloat(missingPct) > 10) {
+      insights.push(`🚨 Highly Incomplete: This column is missing ${missingPct}% of its values. Imputation is strongly recommended before downstream ML training.`);
+    } else if (parseFloat(missingPct) > 0) {
+      insights.push(`ℹ️ Slight Sparsity: A minor ${missingPct}% of records are null. Can be easily resolved in standard sanitization.`);
+    }
+
+    if (isNumericCol) {
+      const meanVal = colSummary.mean || 0;
+      const medianVal = colSummary.median || 0;
+      const stdVal = colSummary.std || 0;
+      const diffPct = Math.abs((meanVal - medianVal) / (meanVal || 1)) * 100;
+      
+      if (diffPct > 15) {
+        insights.push(`📈 Distribution Skewness: The mean (${meanVal.toFixed(2)}) is significantly different from the median (${medianVal.toFixed(2)}), suggesting a highly skewed distribution.`);
+      }
+      if (stdVal > meanVal) {
+        insights.push(`⚠️ High Variance: Standard deviation (${stdVal.toFixed(2)}) exceeds the mean (${meanVal.toFixed(2)}), showing large dispersion of numeric data.`);
+      }
+    } else {
+      if (colSummary.top && colSummary.freq) {
+        const topPct = ((colSummary.freq / (activeDataset.rowCount || 1)) * 100).toFixed(1);
+        if (parseFloat(topPct) > 60) {
+          insights.push(`🎯 Dominant Class: The category '${colSummary.top}' dominates the column, accounting for ${topPct}% of all records.`);
+        }
+      }
+    }
+
+    return insights.length > 0 ? insights : ['✨ Healthy distribution with no major cardinality or missingness flags detected. Ready for analysis.'];
+  }, [colSummary, activeDataset, isNumericCol]);
+
+  const COLORS = ['#6366f1', '#06b6d4', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+
+  // Export svg to png
   const handleDownloadPNG = (containerId, title) => {
     try {
       const container = document.getElementById(containerId);
@@ -112,11 +212,10 @@ const Visualizations = () => {
 
       const svg = container.querySelector('svg');
       if (!svg) {
-        alert('Chart SVG element not found.');
+        alert('Chart element not fully loaded yet.');
         return;
       }
 
-      // Extract SVG string
       const svgSerializer = new XMLSerializer();
       const svgString = svgSerializer.serializeToString(svg);
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -131,19 +230,15 @@ const Visualizations = () => {
         canvas.height = svg.clientHeight || 450;
         
         const context = canvas.getContext('2d');
-        // Render theme background matching #0b0f19
-        context.fillStyle = '#0b0f19';
+        context.fillStyle = '#0f172a'; // SaaS Slate-900 background
         context.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Add chart title header onto canvas
         context.fillStyle = '#f8fafc';
-        context.font = 'bold 14px "Outfit", "Inter", sans-serif';
+        context.font = 'bold 15px "Inter", sans-serif';
         context.fillText(title, 20, 30);
         
-        // Draw the serialized SVG image
-        context.drawImage(image, 0, 40, canvas.width, canvas.height - 50);
+        context.drawImage(image, 0, 45, canvas.width, canvas.height - 55);
         
-        // Trigger file download
         const pngURL = canvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
         downloadLink.href = pngURL;
@@ -155,8 +250,153 @@ const Visualizations = () => {
       };
       image.src = blobURL;
     } catch (err) {
-      console.error('Failed to download chart:', err);
+      console.error('Failed to export chart:', err);
       alert('Failed to export chart as PNG.');
+    }
+  };
+
+  const renderActiveChart = () => {
+    if (!distInfo || !distInfo.data || distInfo.data.length === 0) {
+      return (
+        <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
+          <p className="text-slate-500 italic text-sm">No distribution metrics computed for column: {selectedCol}</p>
+        </div>
+      );
+    }
+
+    const chartData = distInfo.data.map((item, idx) => ({
+      ...item,
+      // Adapt keys dynamically for different Recharts chart structures
+      name: isNumericCol ? item.bin_range : item.category,
+      value: item.count,
+      index: idx
+    }));
+
+    switch (selectedChartType) {
+      case 'pie':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }}
+                itemStyle={{ color: '#f8fafc' }}
+              />
+              <Pie
+                data={chartData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                labelLine={true}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+            </PieChart>
+          </ResponsiveContainer>
+        );
+      case 'line':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+              <defs>
+                <linearGradient id="lineColor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
+              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+              <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2.5} fillOpacity={1} fill="url(#lineColor)" name="Count" />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+      case 'area':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 15, right: 15, left: -20, bottom: 5 }}>
+              <defs>
+                <linearGradient id="areaColor" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4}/>
+                  <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
+              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+              <Area type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={2} fillOpacity={1} fill="url(#areaColor)" name="Count" />
+            </AreaChart>
+          </ResponsiveContainer>
+        );
+      case 'scatter':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <ScatterChart margin={{ top: 20, right: 20, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis type="category" dataKey="name" name="Value" stroke="#64748b" fontSize={9} />
+              <YAxis type="number" dataKey="value" name="Count" stroke="#64748b" fontSize={10} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+              <Scatter name="Distribution" data={chartData} fill="#8b5cf6">
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
+        );
+      case 'bar':
+        // Horizontal Bar
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} />
+              <YAxis type="category" dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} width={80} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+              <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} name="Count">
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      case 'column':
+      case 'histogram':
+      default:
+        // Vertical Column
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
+              <XAxis dataKey="name" stroke="#64748b" fontSize={9} tickLine={false} />
+              <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+              <Tooltip contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', borderColor: '#334155', borderRadius: '8px' }} />
+              <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} name="Count">
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? 'url(#indigoGrad)' : 'url(#cyanGrad)'} />
+                ))}
+              </Bar>
+              <defs>
+                <linearGradient id="indigoGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.85}/>
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.45}/>
+                </linearGradient>
+                <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.85}/>
+                  <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.45}/>
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
+        );
     }
   };
 
@@ -175,7 +415,7 @@ const Visualizations = () => {
     return (
       <Layout>
         <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
-          <h4 className="text-rose-455 font-extrabold text-sm mb-2">Error Loading Visualizations</h4>
+          <h4 className="text-rose-400 font-extrabold text-sm mb-2">Error Loading Visualizations</h4>
           <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
         </div>
       </Layout>
@@ -192,182 +432,32 @@ const Visualizations = () => {
     );
   }
 
-  const { distributions, correlationMatrix, missingValues, outliers } = visualizationData;
-
-  const distInfo = distributions[selectedCol];
-  const colSummary = activeDataset.edaResults?.column_summaries?.[selectedCol];
-
-  // Recharts color palette
-  const COLORS = ['#6366f1', '#06b6d4', '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
-
-  const renderDistributionChart = () => {
-    if (!distInfo || !distInfo.data || distInfo.data.length === 0) {
-      return (
-        <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-          <p className="text-slate-500 italic text-sm">No distribution metrics computed for column: {selectedCol}</p>
-        </div>
-      );
-    }
-
-    const isNumeric = distInfo.type === 'numeric';
-
-    return (
-      <div className="space-y-6">
-        {/* Statistics highlights box */}
-        {colSummary && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-slate-900/35 border border-slate-850 rounded-xl text-xs font-semibold">
-            <div>
-              <span className="text-slate-550 block uppercase tracking-wide mb-0.5">Missing Rows</span>
-              <span className="text-slate-350 text-sm font-bold font-mono">
-                {colSummary.missing_count} ({((colSummary.missing_count / (activeDataset.rowCount || 1)) * 100).toFixed(1)}%)
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-550 block uppercase tracking-wide mb-0.5">Unique Values</span>
-              <span className="text-slate-350 text-sm font-bold font-mono">{colSummary.unique_count.toLocaleString()}</span>
-            </div>
-            {isNumeric ? (
-              <>
-                <div>
-                  <span className="text-slate-550 block uppercase tracking-wide mb-0.5">Average Mean</span>
-                  <span className="text-indigo-300 text-sm font-black font-mono">{colSummary.mean?.toFixed(4)}</span>
-                </div>
-                <div>
-                  <span className="text-slate-550 block uppercase tracking-wide mb-0.5">Median (Q50)</span>
-                  <span className="text-cyan-300 text-sm font-black font-mono">{colSummary.median?.toFixed(4)}</span>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="col-span-2">
-                  <span className="text-slate-550 block uppercase tracking-wide mb-0.5">Mode (Top Category)</span>
-                  <span className="text-indigo-300 text-sm font-black truncate block max-w-xs" title={colSummary.top}>
-                    {colSummary.top || 'None'} ({colSummary.freq} counts)
-                  </span>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Chart View */}
-        <div id="distribution-chart-wrapper" className="h-[320px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
-          <ResponsiveContainer width="100%" height="100%">
-            {isNumeric ? (
-              <BarChart
-                data={distInfo.data}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
-                <XAxis 
-                  dataKey="bin_range" 
-                  stroke="#64748b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                />
-                <YAxis 
-                  stroke="#64748b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)', 
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    borderRadius: '8px'
-                  }}
-                  itemStyle={{ color: '#818cf8', fontWeight: 'bold' }}
-                  labelStyle={{ color: '#94a3b8' }}
-                  cursor={{ fill: 'rgba(99, 102, 241, 0.05)' }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  fill="#6366f1" 
-                  radius={[4, 4, 0, 0]}
-                  name="Frequency"
-                >
-                  {distInfo.data.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={index % 2 === 0 ? 'url(#indigoGradient)' : 'url(#cyanGradient)'} 
-                    />
-                  ))}
-                </Bar>
-                <defs>
-                  <linearGradient id="indigoGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.85}/>
-                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0.45}/>
-                  </linearGradient>
-                  <linearGradient id="cyanGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.85}/>
-                    <stop offset="100%" stopColor="#06b6d4" stopOpacity={0.45}/>
-                  </linearGradient>
-                </defs>
-              </BarChart>
-            ) : (
-              <BarChart
-                data={distInfo.data}
-                margin={{ top: 10, right: 10, left: -20, bottom: 20 }}
-              >
-                <XAxis 
-                  dataKey="category" 
-                  stroke="#64748b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  angle={-15}
-                  textAnchor="end"
-                />
-                <YAxis 
-                  stroke="#64748b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)', 
-                    borderColor: 'rgba(255,255,255,0.08)',
-                    borderRadius: '8px'
-                  }}
-                  itemStyle={{ color: '#38bdf8', fontWeight: 'bold' }}
-                  labelStyle={{ color: '#94a3b8' }}
-                  cursor={{ fill: 'rgba(255,255,255,0.02)' }}
-                />
-                <Bar 
-                  dataKey="count" 
-                  radius={[4, 4, 0, 0]}
-                  name="Value Count"
-                >
-                  {distInfo.data.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            )}
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  };
+  const { correlationMatrix, missingAnalysis, outliersAnalysis } = visualizationData;
+  const datasetDisplayName = activeDataset.datasetName || activeDataset.originalName || 'Active Dataset';
 
   return (
     <Layout>
       <div className="space-y-8">
         {/* Header Title */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
-            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight">Visual Analytics</h2>
+            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2.5">
+              <BarChart3 className="text-indigo-400" size={28} />
+              <span>Visual Analytics</span>
+            </h2>
             <p className="text-slate-400 text-sm mt-1">
-              Explore tabular data using dynamic histograms, category frequencies, null audits, and Pearson correlation matrices for <span className="text-indigo-400 font-bold">{activeDataset.originalName}</span>.
+              Explore dynamic charts, recommend visual representation models, and audit Pearson correlation spaces in <span className="text-indigo-400 font-bold">{datasetDisplayName}</span>.
             </p>
           </div>
           
           {/* Tab Selector */}
-          <div className="flex border border-slate-800 p-1 bg-slate-900/60 rounded-xl text-xs font-bold uppercase tracking-wider overflow-x-auto">
+          <div className="flex border border-slate-900 p-1 bg-slate-950/40 rounded-xl text-xs font-bold uppercase tracking-wider overflow-x-auto self-start xl:self-auto">
             <button
               onClick={() => setActiveTab('distribution')}
               className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === 'distribution' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
+                  : 'text-slate-500 hover:text-slate-350'
               }`}
             >
               <BarChart3 size={14} />
@@ -378,20 +468,20 @@ const Visualizations = () => {
               onClick={() => setActiveTab('correlation')}
               className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === 'correlation' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
+                  : 'text-slate-500 hover:text-slate-350'
               }`}
             >
-              <ScatterChart size={14} />
+              <ScatterIcon size={14} />
               <span>Correlations Matrix</span>
             </button>
-
+            
             <button
               onClick={() => setActiveTab('missing')}
               className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === 'missing' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
+                  : 'text-slate-500 hover:text-slate-350'
               }`}
             >
               <ListMinus size={14} />
@@ -402,12 +492,12 @@ const Visualizations = () => {
               onClick={() => setActiveTab('outliers')}
               className={`px-3.5 py-2 rounded-lg flex items-center gap-2 transition-all whitespace-nowrap ${
                 activeTab === 'outliers' 
-                  ? 'bg-indigo-600 text-white shadow-md' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 font-bold' 
+                  : 'text-slate-500 hover:text-slate-350'
               }`}
             >
               <TrendingDown size={14} />
-              <span>Outliers Box Plots</span>
+              <span>Outliers Audit</span>
             </button>
           </div>
         </div>
@@ -415,24 +505,25 @@ const Visualizations = () => {
         {/* Tab contents */}
         {activeTab === 'distribution' && (
           <div className="glass-card rounded-2xl p-6 border border-slate-800/80 grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div className="lg:col-span-1 border-r border-slate-900 pr-0 lg:pr-6">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3.5 flex items-center gap-1.5">
+            {/* Columns list */}
+            <div className="lg:col-span-1 border-r border-slate-900/60 pr-0 lg:pr-6">
+              <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3.5 flex items-center gap-1.5">
                 <Compass size={14} />
                 <span>Select Feature</span>
               </h4>
               
-              <div className="space-y-1 overflow-y-auto max-h-[360px] pr-2">
+              <div className="space-y-1 overflow-y-auto max-h-[380px] pr-2">
                 {columns.map((col) => (
                   <button
                     key={col.name}
                     onClick={() => setSelectedCol(col.name)}
-                    className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all ${
+                    className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between border transition-all ${
                       selectedCol === col.name
                         ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 font-bold'
-                        : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-900/40 hover:text-slate-250'
+                        : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-900/40 hover:text-slate-300'
                     }`}
                   >
-                    <span className="truncate max-w-[130px]">{col.name}</span>
+                    <span className="truncate max-w-[140px]">{col.name}</span>
                     <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-900 text-slate-500 uppercase tracking-widest font-mono">
                       {col.type}
                     </span>
@@ -441,40 +532,115 @@ const Visualizations = () => {
               </div>
             </div>
 
-            <div className="lg:col-span-3 flex flex-col justify-between">
+            {/* Visuals display */}
+            <div className="lg:col-span-3 flex flex-col justify-between space-y-6">
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-black text-slate-200">
-                      Distribution of: <span className="text-indigo-400">{selectedCol}</span>
+                      Feature: <span className="text-indigo-400">{selectedCol}</span>
                     </h3>
-                    <span className="text-[10px] font-bold text-slate-550 uppercase font-mono bg-slate-900 px-2 py-0.5 rounded">
-                      {selectedColType}
-                    </span>
                   </div>
-                  <button
-                    onClick={() => handleDownloadPNG('distribution-chart-wrapper', `${selectedCol} Distribution`)}
-                    className="flex items-center gap-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
-                  >
-                    <Download size={12} />
-                    <span>Download PNG</span>
-                  </button>
+                  
+                  {/* Chart Switcher */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Chart:</span>
+                    <select
+                      value={selectedChartType}
+                      onChange={e => setSelectedChartType(e.target.value)}
+                      className="bg-slate-950 border border-slate-850 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-350 focus:outline-none focus:border-indigo-500"
+                    >
+                      <option value="bar">Bar (Horizontal)</option>
+                      <option value="column">Column (Vertical)</option>
+                      <option value="pie">Pie Chart</option>
+                      <option value="line">Line Chart</option>
+                      <option value="area">Area Chart</option>
+                      <option value="scatter">Scatter Plot</option>
+                    </select>
+
+                    <button
+                      onClick={() => handleDownloadPNG('distribution-chart-container', `${selectedCol} Distribution`)}
+                      className="p-1.5 bg-slate-900 border border-slate-850 hover:border-slate-700 text-slate-400 hover:text-slate-200 rounded-lg transition-all"
+                      title="Download PNG"
+                    >
+                      <Download size={13} />
+                    </button>
+                  </div>
                 </div>
-                {renderDistributionChart()}
+
+                {/* Recommendation Alert Box */}
+                {recommendation && (
+                  <div className="p-3 bg-indigo-500/[0.02] border border-indigo-500/10 rounded-xl flex items-start gap-2 text-[10px] text-indigo-300">
+                    <Brain size={14} className="text-indigo-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="font-extrabold uppercase text-[8px] tracking-wide bg-indigo-500/15 px-1.5 py-0.5 rounded text-indigo-400 mr-1.5">AI Recommended Chart</span>
+                      <span className="font-bold text-slate-200 mr-1">{recommendation.text}:</span>
+                      <span>{recommendation.reason}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary boxes */}
+                {colSummary && (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-3 bg-slate-900/25 border border-slate-900 rounded-xl text-[10px] font-semibold text-slate-450">
+                    <div>
+                      <span className="text-slate-550 block uppercase tracking-wide">Missing Values</span>
+                      <span className="text-slate-300 font-mono font-bold mt-0.5 block">
+                        {colSummary.missing_count} ({((colSummary.missing_count / (activeDataset.rowCount || 1)) * 100).toFixed(1)}%)
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-550 block uppercase tracking-wide">Unique Cards</span>
+                      <span className="text-slate-300 font-mono font-bold mt-0.5 block">{colSummary.unique_count.toLocaleString()}</span>
+                    </div>
+                    {isNumericCol ? (
+                      <>
+                        <div>
+                          <span className="text-slate-550 block uppercase tracking-wide">Average Mean</span>
+                          <span className="text-indigo-300 font-mono font-bold mt-0.5 block">{colSummary.mean?.toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-550 block uppercase tracking-wide">Standard Dev</span>
+                          <span className="text-cyan-300 font-mono font-bold mt-0.5 block">{colSummary.std?.toFixed(2)}</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="col-span-2">
+                        <span className="text-slate-550 block uppercase tracking-wide">Top Category</span>
+                        <span className="text-indigo-300 font-bold truncate mt-0.5 block max-w-[200px]" title={colSummary.top}>
+                          {colSummary.top || 'N/A'} ({colSummary.freq} counts)
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Chart Box */}
+                <div id="distribution-chart-container" className="h-[280px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
+                  {renderActiveChart()}
+                </div>
               </div>
-              
-              <div className="mt-6 flex items-start gap-3 bg-indigo-500/5 border border-indigo-500/10 p-3.5 rounded-xl text-[11px] text-indigo-300 leading-relaxed font-semibold">
-                <Info size={16} className="mt-0.5 flex-shrink-0 text-indigo-400" />
-                <span>
-                  Numeric elements group datasets into 10 mathematical bins. Categorical variables are structured into the top 10 categories, wrapping smaller entries into the other index category.
-                </span>
+
+              {/* Dynamic Insights Section */}
+              <div className="space-y-2 border-t border-slate-900/60 pt-4">
+                <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles size={11} className="text-indigo-400" />
+                  <span>Column Distribution Insights</span>
+                </h4>
+                <div className="space-y-1.5">
+                  {columnInsights.map((insight, idx) => (
+                    <p key={idx} className="text-[11px] text-slate-350 leading-relaxed font-medium">
+                      {insight}
+                    </p>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         )}
 
         {activeTab === 'correlation' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-4">
+          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
               <div>
                 <h3 className="text-base font-black text-slate-200">Pearson Correlation Matrix</h3>
@@ -482,21 +648,21 @@ const Visualizations = () => {
               </div>
               <button
                 onClick={() => handleDownloadPNG('correlation-heatmap-container', 'Pearson Correlations')}
-                className="flex items-center gap-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all"
+                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
               >
                 <Download size={12} />
                 <span>Download PNG</span>
               </button>
             </div>
             
-            <div id="correlation-heatmap-container">
+            <div id="correlation-heatmap-container" className="pt-2">
               <CorrelationHeatmap correlationMatrix={correlationMatrix} />
             </div>
           </div>
         )}
 
         {activeTab === 'missing' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-4">
+          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
               <div>
                 <h3 className="text-base font-black text-slate-200">Missing Values Summary</h3>
@@ -504,27 +670,34 @@ const Visualizations = () => {
               </div>
               <button
                 onClick={() => handleDownloadPNG('missing-values-chart-wrapper', 'Missing Values Audit')}
-                className="flex items-center gap-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all"
+                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
               >
                 <Download size={12} />
                 <span>Download PNG</span>
               </button>
             </div>
 
-            {missingValues && missingValues.length > 0 ? (
+            {missingAnalysis && Object.keys(missingAnalysis).length > 0 ? (
               <div id="missing-values-chart-wrapper" className="h-[340px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={missingValues} margin={{ top: 20, right: 10, left: -20, bottom: 20 }}>
+                  <BarChart 
+                    data={Object.entries(missingAnalysis).map(([col, info]) => ({
+                      column: col,
+                      missingCount: info.count,
+                      percentage: info.percentage
+                    }))} 
+                    margin={{ top: 20, right: 10, left: -20, bottom: 20 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="column" stroke="#64748b" fontSize={10} angle={-25} textAnchor="end" />
-                    <YAxis stroke="#64748b" fontSize={10} />
+                    <XAxis dataKey="column" stroke="#64748b" fontSize={9} angle={-25} textAnchor="end" tickLine={false} />
+                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px' }}
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px' }}
                       itemStyle={{ color: '#ef4444', fontWeight: 'bold' }}
                     />
                     <Bar dataKey="missingCount" fill="#ef4444" name="Null Count" radius={[4, 4, 0, 0]}>
-                      {missingValues.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.missingCount > 0 ? '#ef4444' : '#10b981'} />
+                      {Object.entries(missingAnalysis).map(([col, info], index) => (
+                        <Cell key={`cell-${index}`} fill={info.count > 0 ? '#ef4444' : '#10b981'} />
                       ))}
                     </Bar>
                   </BarChart>
@@ -539,7 +712,7 @@ const Visualizations = () => {
         )}
 
         {activeTab === 'outliers' && (
-          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-4">
+          <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-5">
             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
               <div>
                 <h3 className="text-base font-black text-slate-200">Outlier Box Plot Ranges</h3>
@@ -547,42 +720,53 @@ const Visualizations = () => {
               </div>
               <button
                 onClick={() => handleDownloadPNG('outliers-chart-wrapper', 'Outliers Box Ranges')}
-                className="flex items-center gap-1 text-[10px] bg-slate-900 border border-slate-800 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all"
+                className="flex items-center gap-1.5 text-[10px] bg-slate-900 border border-slate-850 text-slate-400 font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:border-slate-700 transition-all self-start"
               >
                 <Download size={12} />
                 <span>Download PNG</span>
               </button>
             </div>
 
-            {outliers && outliers.length > 0 ? (
+            {outliersAnalysis && Object.keys(outliersAnalysis).length > 0 && Object.values(outliersAnalysis).some(o => o.count > 0) ? (
               <div id="outliers-chart-wrapper" className="h-[360px] w-full bg-slate-950/20 p-2 rounded-xl border border-slate-900">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={outliers} margin={{ top: 20, right: 10, left: -10, bottom: 20 }}>
+                  <ComposedChart 
+                    data={Object.entries(outliersAnalysis)
+                      .filter(([col, o]) => activeDataset.edaResults?.column_summaries?.[col]?.type === 'numeric')
+                      .map(([col, o]) => {
+                        const sum = activeDataset.edaResults?.column_summaries?.[col] || {};
+                        return {
+                          column: col,
+                          min: sum.min || 0,
+                          q25: sum.q25 || 0,
+                          median: sum.median || 0,
+                          q75: sum.q75 || 0,
+                          max: sum.max || 0,
+                          outliersCount: o.count
+                        };
+                      })
+                    } 
+                    margin={{ top: 20, right: 10, left: -10, bottom: 20 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
-                    <XAxis dataKey="column" stroke="#64748b" fontSize={10} angle={-20} textAnchor="end" />
-                    <YAxis stroke="#64748b" fontSize={10} />
+                    <XAxis dataKey="column" stroke="#64748b" fontSize={9} angle={-20} textAnchor="end" tickLine={false} />
+                    <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
                     <Tooltip 
-                      contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.08)', borderRadius: '8px', color: '#f8fafc' }}
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '8px', color: '#f8fafc' }}
                       formatter={(value, name, props) => {
                         if (name === "Box Range") return [`${props.payload.q25.toFixed(2)} - ${props.payload.q75.toFixed(2)}`, "Q25-Q75 Box"];
                         return [value.toFixed(2), name];
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: '10px' }} />
-                    {/* Floating Bar for Q25 to Q75 */}
                     <Bar 
                       dataKey="q75" 
-                      fill="rgba(99, 102, 241, 0.4)" 
+                      fill="rgba(99, 102, 241, 0.25)" 
                       stroke="#6366f1"
                       strokeWidth={1}
                       name="Box Range"
                       radius={2}
-                    >
-                      {outliers.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill="rgba(99, 102, 241, 0.25)" stroke="#6366f1" />
-                      ))}
-                    </Bar>
-                    {/* Median Line representation */}
+                    />
                     <Line 
                       type="monotone" 
                       dataKey="median" 
@@ -591,7 +775,6 @@ const Visualizations = () => {
                       dot={{ r: 4, stroke: '#06b6d4', strokeWidth: 1, fill: '#0b0f19' }}
                       name="Median" 
                     />
-                    {/* Outer Limits points */}
                     <Line 
                       type="monotone" 
                       dataKey="max" 
@@ -615,7 +798,7 @@ const Visualizations = () => {
               </div>
             ) : (
               <div className="flex items-center justify-center p-8 bg-slate-900/10 border border-slate-850 rounded-xl min-h-[250px]">
-                <p className="text-slate-500 italic text-sm">No numeric features detected to calculate outliers.</p>
+                <p className="text-slate-500 italic text-sm">No numeric outlier distributions computed for this dataset.</p>
               </div>
             )}
           </div>
