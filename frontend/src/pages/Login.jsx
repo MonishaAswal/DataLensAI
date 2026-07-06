@@ -25,8 +25,12 @@ const Login = () => {
 
     setIsSubmitting(true);
     try {
-      await login(email, password);
-      navigate('/upload');
+      const response = await login(email, password);
+      if (response && response.activeDataset) {
+        navigate('/overview');
+      } else {
+        navigate('/upload');
+      }
     } catch (err) {
       console.error(err);
       const errMsg = err.response?.data?.message || err.message || 'Invalid credentials. Please check your email and password.';

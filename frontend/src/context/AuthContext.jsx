@@ -72,10 +72,11 @@ export const AuthProvider = ({ children }) => {
     setUser(activeUser);
     
     // Auto-load most recent dataset on login
+    let mostRecent = null;
     try {
       const datasets = await datasetService.getDatasets();
       if (datasets && datasets.length > 0) {
-        const mostRecent = {
+        mostRecent = {
           id: datasets[0]._id || datasets[0].id,
           _id: datasets[0]._id || datasets[0].id,
           ...datasets[0]
@@ -87,7 +88,7 @@ export const AuthProvider = ({ children }) => {
       console.warn('Auto-loading most recent dataset on login failed:', err.message);
     }
     
-    return activeUser;
+    return { user: activeUser, activeDataset: mostRecent };
   };
 
   const register = async (name, email, password) => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { datasetService } from '../services/api';
+import { datasetService, historyService } from '../services/api';
 import Layout from '../components/Layout';
 import StatCard from '../components/StatCard';
 import DataPreviewTable from '../components/DataPreviewTable';
@@ -14,20 +15,422 @@ import {
   Loader2,
   Edit2,
   Check,
-  X
+  X,
+  Clock,
+  ExternalLink,
+  Trash2,
+  ArrowRight,
+  Sparkles,
+  Brain,
+  Layers,
+  FileSpreadsheet,
+  FileText
 } from 'lucide-react';
 
 const Dashboard = ({ isTabbed = false }) => {
   const { activeDataset, setActiveDataset } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overviewData, setOverviewData] = useState(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState('');
 
+  // Landing page states
+  const [userDatasets, setUserDatasets] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [selectedReport, setSelectedReport] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+
   const wrapLayout = (el) => {
     if (isTabbed) return el;
     return <Layout>{el}</Layout>;
+  };
+
+  useEffect(() => {
+    const fetchWorkspaceHistory = async () => {
+      if (activeDataset?._id || activeDataset?.id) return;
+      try {
+        setWorkspaceLoading(true);
+        setWorkspaceError('');
+        const [datasets, history] = await Promise.all([
+          datasetService.getDatasets(),
+          historyService.getHistory()
+        ]);
+        const mappedDatasets = datasets.map(d => ({
+          id: d._id || d.id,
+          _id: d._id || d.id,
+          ...d
+        }));
+        setUserDatasets(mappedDatasets || []);
+        setRecentActivity(history || []);
+      } catch (err) {
+        console.error('Failed to load workspace history:', err);
+        setWorkspaceError('Failed to retrieve previously analyzed datasets or recent activity.');
+      } finally {
+        setWorkspaceLoading(false);
+      }
+    };
+    fetchWorkspaceHistory();
+  }, [activeDataset]);
+
+  const handleOpenDataset = (dataset) => {
+    const activePayload = {
+      id: dataset._id || dataset.id,
+      _id: dataset._id || dataset.id,
+      ...dataset
+    };
+    setActiveDataset(activePayload);
+  };
+
+  const handleDeleteDataset = async (e, datasetId) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to permanently delete this dataset? This cannot be undone.')) {
+      return;
+    }
+    try {
+      setWorkspaceError('');
+      await datasetService.deleteDataset(datasetId);
+      setUserDatasets(userDatasets.filter(d => d._id !== datasetId && d.id !== datasetId));
+    } catch (err) {
+      console.error('Failed to delete dataset:', err);
+      setWorkspaceError('Failed to delete dataset.');
+    }
+  };
+
+  const getIcon = (type) => {
+    switch (type) {
+      case 'Smart AI Imputation':
+        return <Brain className="text-violet-400" size={16} />;
+      case 'Standard Sanitization':
+        return <CheckCircle2 className="text-emerald-400" size={16} />;
+      case 'AI Insights Generation':
+        return <Sparkles className="text-indigo-400" size={16} />;
+      case 'Visualization Generation':
+        return <Layers className="text-cyan-400" size={16} />;
+      default:
+        return <FileSpreadsheet className="text-slate-500" size={16} />;
+    }
+  };
+
+  const handleOpenReportModal = (logItem) => {
+    let parsedReport = null;
+    try {
+      parsedReport = JSON.parse(logItem.report);
+    } catch (e) {
+      parsedReport = logItem.report;
+    }
+
+    setSelectedReport({
+      ...logItem,
+      details: parsedReport
+    });
+    setShowModal(true);
+  };
+
+  const renderLandingDashboard = () => {
+    if (workspaceLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
+          <Loader2 size={36} className="text-indigo-500 animate-spin" />
+          <p className="text-slate-400 text-sm font-semibold">Retrieving previous dataset analysis histories...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-10 animate-fade-in max-w-7xl mx-auto">
+        {/* Welcome Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-5 border-b border-slate-900 pb-6">
+          <div>
+            <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-3">
+              <span>Welcome Back!</span>
+            </h2>
+            <p className="text-slate-400 text-sm mt-1">
+              Analyze, clean, and explore your tabular datasets using machine learning and AI insights.
+            </p>
+          </div>
+          
+          <button
+            onClick={() => navigate('/upload')}
+            className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-lg hover:shadow-indigo-600/10 active:scale-[0.98] transition-all"
+          >
+            Upload New Dataset
+          </button>
+        </div>
+
+        {workspaceError && (
+          <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-450 rounded-xl text-xs font-semibold">
+            {workspaceError}
+          </div>
+        )}
+
+        {/* Previously Analyzed Datasets */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-2.5">
+            <Database className="text-indigo-400" size={20} />
+            <h3 className="text-base font-extrabold text-slate-205">Previously Analyzed Datasets</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {userDatasets.length === 0 ? (
+              <div className="glass-card rounded-2xl p-10 text-center border border-slate-800/80 min-h-[220px] flex flex-col items-center justify-center col-span-full">
+                <div className="bg-slate-900/60 p-3.5 rounded-full text-slate-600 border border-slate-850 mb-3.5 shadow-md">
+                  <Database size={24} />
+                </div>
+                <h4 className="text-sm font-bold text-slate-355">No datasets found in account</h4>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm">Upload your first CSV or Excel file to launch AI data-cleaning pipelines.</p>
+                <button
+                  onClick={() => navigate('/upload')}
+                  className="mt-5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all"
+                >
+                  Upload Dataset
+                </button>
+              </div>
+            ) : (
+              userDatasets.map((dataset) => {
+                const score = dataset.edaResults?.quality_score || dataset.qualityScore || 85;
+                const dateStr = new Date(dataset.createdAt).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                });
+                const sizeKb = (dataset.size / 1024).toFixed(1);
+                
+                return (
+                  <div key={dataset._id || dataset.id} className="glass-card rounded-2xl border border-slate-855 p-5 shadow-lg hover:border-indigo-500/30 transition-all flex flex-col justify-between group">
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 group-hover:scale-105 transition-transform flex-shrink-0">
+                            <FileSpreadsheet size={20} />
+                          </div>
+                          <div className="overflow-hidden">
+                            <h4 className="text-sm font-bold text-slate-200 truncate pr-2" title={dataset.datasetName || dataset.originalName}>
+                              {dataset.datasetName || dataset.originalName}
+                            </h4>
+                            <p className="text-[10px] text-slate-505 mt-0.5 font-semibold">Uploaded on {dateStr}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => handleDeleteDataset(e, dataset._id || dataset.id)}
+                          className="p-1.5 rounded-lg bg-slate-900 border border-slate-850 text-slate-500 hover:text-rose-455 hover:border-rose-500/30 transition-all flex-shrink-0"
+                          title="Delete dataset permanently"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3.5 py-3.5 border-y border-slate-900/60 text-xs font-semibold text-slate-400">
+                        <div>
+                          <span className="text-[9px] text-slate-655 block uppercase tracking-wider">Dimensions</span>
+                          <span className="text-slate-250 font-mono mt-0.5 block">{dataset.rowCount?.toLocaleString()} × {dataset.columnCount}</span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] text-slate-655 block uppercase tracking-wider">File Size</span>
+                          <span className="text-slate-250 font-mono mt-0.5 block">{sizeKb} KB</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-slate-500 font-bold uppercase tracking-wider">Quality Score</span>
+                          <span className={`font-mono font-bold ${score >= 80 ? 'text-emerald-400' : score >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>{score}/100</span>
+                        </div>
+                        <div className="w-full bg-slate-900/80 rounded-full h-1.5 overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full ${score >= 80 ? 'bg-emerald-500' : score >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                            style={{ width: `${score}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleOpenDataset(dataset)}
+                      className="w-full mt-5 py-2.5 bg-slate-900 hover:bg-slate-850 group-hover:bg-gradient-to-r group-hover:from-indigo-600 group-hover:to-cyan-600 group-hover:text-white border border-slate-800/80 hover:border-transparent text-slate-350 text-xs font-bold uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                    >
+                      <span>Open Workspace</span>
+                      <ArrowRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="space-y-4 max-w-4xl">
+          <div className="flex items-center gap-2.5">
+            <History className="text-indigo-400" size={20} />
+            <h3 className="text-base font-extrabold text-slate-205">Recent Activity</h3>
+          </div>
+          
+          <div className="glass-card rounded-2xl border border-slate-800/80 p-5 space-y-3.5 shadow-lg">
+            {recentActivity.length === 0 ? (
+              <p className="text-xs text-slate-500 italic text-center py-4">No audit history entries logged yet.</p>
+            ) : (
+              recentActivity.slice(0, 5).map((item) => {
+                const activityDate = new Date(item.createdAt).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                return (
+                  <div key={item._id || item.id} className="p-3.5 bg-slate-900/20 border border-slate-900 hover:border-slate-850 rounded-xl flex items-center justify-between gap-4 transition-all">
+                    <div className="flex items-center gap-3.5 overflow-hidden">
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-850 flex-shrink-0">
+                        {getIcon(item.operationType)}
+                      </div>
+                      <div className="overflow-hidden">
+                        <span className="text-xs font-bold text-slate-200 block truncate">{item.operationType}</span>
+                        <span className="text-[10px] text-slate-505 block truncate font-semibold mt-0.5">Dataset: {item.datasetName} • {activityDate}</span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleOpenReportModal(item)}
+                      className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30 rounded-xl font-bold uppercase tracking-wider text-[9px] flex items-center gap-1 transition-all flex-shrink-0"
+                    >
+                      <FileText size={12} />
+                      <span>Report</span>
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Modal Dialog for displaying Operation Report details */}
+        {showModal && selectedReport && (
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-fade-in">
+            <div className="w-full max-w-2xl bg-slate-950 border border-slate-800 rounded-2xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
+              <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-cyan-500"></div>
+              
+              {/* Modal Header */}
+              <div className="p-6 border-b border-slate-900 flex justify-between items-center bg-slate-900/10">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    {getIcon(selectedReport.operationType)}
+                    <h3 className="text-base font-black text-slate-200">{selectedReport.operationType} Report</h3>
+                  </div>
+                  <p className="text-[10px] text-slate-505 font-semibold font-mono">Dataset: {selectedReport.datasetName}</p>
+                </div>
+                <button 
+                  onClick={() => setShowModal(false)}
+                  className="p-1.5 bg-slate-900 border border-slate-855 hover:bg-slate-850 text-slate-400 hover:text-slate-200 rounded-xl transition-all"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs leading-relaxed text-slate-350">
+                {/* Standard Sanitization Report */}
+                {selectedReport.operationType === 'Standard Sanitization' && selectedReport.details && (
+                  <div className="space-y-4 font-semibold">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div className="p-3 bg-slate-900/30 border border-slate-900 rounded-lg">
+                        <span className="text-[9px] text-slate-555 block uppercase tracking-wider mb-0.5">Rows Offset</span>
+                        <span className="font-mono text-slate-200 text-sm font-black">
+                          {selectedReport.details.rowCountBefore} ➔ {selectedReport.details.rowCountAfter}
+                        </span>
+                      </div>
+                      <div className="p-3 bg-slate-900/30 border border-slate-900 rounded-lg">
+                        <span className="text-[9px] text-slate-555 block uppercase tracking-wider mb-0.5">Columns Offset</span>
+                        <span className="font-mono text-slate-200 text-sm font-black">
+                          {selectedReport.details.colCountBefore} ➔ {selectedReport.details.colCountAfter}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Modifications Applied:</span>
+                      <ul className="space-y-1.5">
+                        {selectedReport.details.summary?.map((act, i) => (
+                          <li key={i} className="bg-slate-900/40 border border-slate-900 px-3.5 py-2 rounded-lg flex items-center gap-2.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-450"></span>
+                            <span>{act}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {/* Smart AI Imputation Report */}
+                {selectedReport.operationType === 'Smart AI Imputation' && selectedReport.details && (
+                  <div className="space-y-4 font-semibold">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div className="p-3 bg-slate-900/30 border border-slate-900 rounded-lg">
+                        <span className="text-[9px] text-slate-555 block uppercase tracking-wider mb-0.5">Total Null Cells Before</span>
+                        <span className="font-mono text-slate-200 text-sm font-black text-rose-450">{selectedReport.details.beforeCount}</span>
+                      </div>
+                      <div className="p-3 bg-slate-900/30 border border-slate-900 rounded-lg">
+                        <span className="text-[9px] text-slate-555 block uppercase tracking-wider mb-0.5">Total Null Cells After</span>
+                        <span className="font-mono text-slate-200 text-sm font-black text-emerald-400">{selectedReport.details.afterCount}</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      <span className="text-[9px] text-slate-555 font-bold uppercase tracking-wider">Imputed Dimensions list:</span>
+                      <div className="space-y-2">
+                        {selectedReport.details.summary?.map((col, i) => (
+                          <div key={i} className="bg-slate-900/40 border border-slate-900 p-3.5 rounded-lg flex flex-col gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-200">{col.column}</span>
+                              <span className="text-[8px] font-bold px-1.5 py-0.5 bg-slate-950 text-slate-500 uppercase tracking-widest font-mono rounded">
+                                {col.type}
+                              </span>
+                            </div>
+                            <div className="text-slate-450 text-[11px]">
+                              Method: <span className="text-indigo-400 font-extrabold">{col.method}</span>
+                            </div>
+                            <div className="text-slate-505 text-[10px] mt-1 flex flex-wrap gap-1 font-mono">
+                              Sample Predictions: {col.samplePredictions?.join(', ')}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* AI Insights Generation (markdown) */}
+                {selectedReport.operationType === 'AI Insights Generation' && (
+                  <div className="markdown-content font-medium bg-slate-900/20 border border-slate-900 p-4 rounded-xl max-h-[300px] overflow-y-auto whitespace-pre-wrap font-mono text-[10.5px] leading-relaxed text-slate-300">
+                    {selectedReport.report}
+                  </div>
+                )}
+
+                {/* Visualization Generation details */}
+                {selectedReport.operationType === 'Visualization Generation' && (
+                  <div className="p-4 bg-slate-900/35 border border-slate-900 text-center rounded-xl font-bold">
+                    <Layers className="mx-auto text-cyan-400 mb-2.5" size={24} />
+                    <p className="text-slate-350">Visualized Category Densities and Correlation Matrix grids in workspace.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-4 border-t border-slate-900 bg-slate-950 text-right">
+                <button 
+                  onClick={() => setShowModal(false)}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-350 hover:text-slate-200 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-all"
+                >
+                  Close Report
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   useEffect(() => {
@@ -71,11 +474,7 @@ const Dashboard = ({ isTabbed = false }) => {
   }
 
   if (!activeDataset || !overviewData) {
-    return wrapLayout(
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-        <p className="text-slate-400 italic">No dataset active in current workspace.</p>
-      </div>
-    );
+    return wrapLayout(renderLandingDashboard());
   }
 
   const {

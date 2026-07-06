@@ -34,7 +34,7 @@ const ProtectedRoute = ({ children }) => {
 
 // Route Guard: Guest Routes for non-logged in users (e.g. login, register)
 const GuestRoute = ({ children }) => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, activeDataset } = useAuth();
   
   if (loading) {
     return (
@@ -45,7 +45,24 @@ const GuestRoute = ({ children }) => {
     );
   }
   
-  return !isAuthenticated ? children : <Navigate to="/upload" replace />;
+  return !isAuthenticated ? children : <Navigate to={activeDataset ? "/overview" : "/upload"} replace />;
+};
+
+// Root Redirect component to dynamically route logged in users
+const RootRedirect = () => {
+  const { isAuthenticated, loading, activeDataset } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-slate-500 font-semibold font-mono text-xs gap-3">
+        <div className="w-10 h-10 rounded-full border-4 border-indigo-500/10 border-t-indigo-500 animate-spin"></div>
+        <span>Syncing DataLens Session...</span>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  return <Navigate to={activeDataset ? "/overview" : "/upload"} replace />;
 };
 
 const App = () => {
@@ -146,8 +163,8 @@ const App = () => {
           />
 
           {/* Fallback redirects */}
-          <Route path="/" element={<Navigate to="/upload" replace />} />
-          <Route path="*" element={<Navigate to="/upload" replace />} />
+          <Route path="/" element={<RootRedirect />} />
+          <Route path="*" element={<RootRedirect />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
