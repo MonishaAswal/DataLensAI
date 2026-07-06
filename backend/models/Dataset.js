@@ -66,6 +66,10 @@ const datasetSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    cleaningReport: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
   },
   {
     timestamps: true,

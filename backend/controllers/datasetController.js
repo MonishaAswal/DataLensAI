@@ -90,7 +90,7 @@ export const cleanDataset = async (req, res) => {
     console.log(`[MongoDB Clean] Cleaning dataset: ${originalName}`);
     
     // Call Python cleaning service
-    const { buffer, cleanSummary } = await cleanDatasetFile(filePath, originalName, {
+    const { buffer, cleanSummary, cleaningReport } = await cleanDatasetFile(filePath, originalName, {
       removeDuplicates,
       imputeNumeric,
       imputeCategorical,
@@ -129,6 +129,7 @@ export const cleanDataset = async (req, res) => {
             columnCount: updatedEdaResults.dimensions?.columns || 0,
             columns: updatedEdaResults.columns || [],
             edaResults: updatedEdaResults,
+            cleaningReport: cleaningReport,
           },
           $push: {
             cleaningActions: { $each: cleanSummary }
@@ -142,6 +143,7 @@ export const cleanDataset = async (req, res) => {
     return res.status(200).json({
       cleanedFileBase64: buffer.toString('base64'),
       cleanSummary,
+      cleaningReport,
       edaResults: updatedEdaResults,
       rowCount: updatedEdaResults.dimensions?.rows || 0,
       columnCount: updatedEdaResults.dimensions?.columns || 0,

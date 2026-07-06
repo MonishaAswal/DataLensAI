@@ -72,6 +72,37 @@ def clean_dataset(file_path: str, output_path: str, options: dict) -> dict:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
                     actions_taken.append(f"Coerced column '{col}' to numeric (detected numeric values).")
 
+    # 4b. Fix Incorrect Numeric Values (Clamp negative values in positive-only columns and remove infinite values)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        col_lower = str(col).lower()
+        positive_only_keywords = ["age", "price", "salary", "count", "quantity", "rate", "amount", "cost", "total", "balance", "income", "revenue"]
+        if any(kw in col_lower for kw in positive_only_keywords):
+            neg_mask = df[col] < 0
+            neg_count = int(neg_mask.sum())
+            if neg_count > 0:
+                df.loc[neg_mask, col] = df.loc[neg_mask, col].abs()
+                actions_taken.append(f"Fixed {neg_count} negative value(s) in positive-only column '{col}' by converting to absolute value.")
+                
+        # Fix Infinite Values (replace with NaN so they get imputed or filled with fallback)
+        inf_mask = np.isinf(df[col])
+        inf_count = int(inf_mask.sum())
+        if inf_count > 0:
+            df.loc[inf_mask, col] = np.nan
+            actions_taken.append(f"Replaced {inf_count} infinite value(s) in column '{col}' with NaN for subsequent imputation.")
+
+    # 4c. Fix Inconsistent Categorical Formatting (trim whitespace and align casing if mixed duplicates exist)
+    for col in df.columns:
+        if df[col].dtype == object or isinstance(df[col].dtype, pd.CategoricalDtype):
+            non_null = df[col].dropna()
+            if not non_null.empty:
+                # Check for duplicate lowercase values
+                unique_vals = non_null.unique()
+                unique_lowered = set(str(v).lower().strip() for v in unique_vals)
+                if len(unique_vals) > len(unique_lowered):
+                    df[col] = df[col].apply(lambda x: str(x).strip().title() if pd.notna(x) and not isinstance(x, (int, float)) else x)
+                    actions_taken.append(f"Standardized text casing and stripped padding in column '{col}' to resolve inconsistencies.")
+
     # 5. Remove empty columns
     if options.get("remove_empty_cols", False) or options.get("removeEmptyCols", False):
         empty_cols = [col for col in df.columns if df[col].isnull().all()]

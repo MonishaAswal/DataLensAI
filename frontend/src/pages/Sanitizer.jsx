@@ -32,6 +32,8 @@ const Sanitizer = ({ isTabbed = false }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showComparison, setShowComparison] = useState(false);
+  const [cleaningReport, setCleaningReport] = useState(null);
+  const [reportTab, setReportTab] = useState('overview'); // 'overview', 'issues', 'fixes'
   const [cleanSummary, setCleanSummary] = useState([]);
   const [beforeStats, setBeforeStats] = useState(null);
   const [cleaningTab, setCleaningTab] = useState('standard'); // 'standard' or 'smart'
@@ -48,8 +50,17 @@ const Sanitizer = ({ isTabbed = false }) => {
     if (currentId !== prevDatasetIdRef.current) {
       setShowComparison(false);
       setCleanSummary([]);
+      setCleaningReport(null);
       setSmartImputationResult(null);
       prevDatasetIdRef.current = currentId;
+    }
+  }, [activeDataset]);
+
+  useEffect(() => {
+    if (activeDataset?.cleaningReport) {
+      setCleaningReport(activeDataset.cleaningReport);
+      setCleanSummary(activeDataset.cleaningActions || []);
+      setShowComparison(true);
     }
   }, [activeDataset]);
 
@@ -108,7 +119,8 @@ const Sanitizer = ({ isTabbed = false }) => {
             rowCountBefore: initialRows,
             rowCountAfter: responseData.rowCount,
             colCountBefore: initialCols,
-            colCountAfter: responseData.columnCount
+            colCountAfter: responseData.columnCount,
+            cleaningReport: responseData.cleaningReport
           })
         });
       } catch (logErr) {
@@ -126,11 +138,13 @@ const Sanitizer = ({ isTabbed = false }) => {
         columnCount: responseData.columnCount,
         columns: responseData.columns,
         edaResults: responseData.edaResults,
-        cleaningActions: updatedDataset.cleaningActions || [...(activeDataset.cleaningActions || []), ...responseData.cleanSummary]
+        cleaningActions: updatedDataset.cleaningActions || [...(activeDataset.cleaningActions || []), ...responseData.cleanSummary],
+        cleaningReport: responseData.cleaningReport
       };
       setActiveDataset(activePayload);
 
       setCleanSummary(responseData.cleanSummary || []);
+      setCleaningReport(responseData.cleaningReport || null);
       setShowComparison(true);
 
     } catch (err) {
@@ -303,73 +317,195 @@ const Sanitizer = ({ isTabbed = false }) => {
             </div>
           </div>
         ) : showComparison ? (
-          /* Before vs After comparison screen */
+          /* Before vs After comparison screen (Professional Cleaning Audit Report) */
           <div className="space-y-6 animate-fade-in">
-            <div className="glass-card rounded-2xl p-6 border border-slate-800/80">
-              <div className="flex items-center gap-2.5 mb-6 text-emerald-400">
-                <CheckCircle size={22} />
-                <h3 className="text-base font-black text-slate-250">Dataset Sanitized Successfully!</h3>
-              </div>
-
-              {/* Stats side-by-side grid */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                {/* Rows count comparison */}
-                <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase mb-1">Row count</span>
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="font-mono text-slate-400 line-through text-xs">{beforeStats?.rows}</span>
-                    <ArrowRight size={12} className="text-slate-500" />
-                    <span className="font-mono font-black text-indigo-300 text-sm">{initialRows}</span>
+            <div className="glass-card rounded-2xl p-6 border border-slate-800/80 space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-900 pb-4">
+                <div className="flex items-center gap-2.5 text-emerald-400">
+                  <CheckCircle size={22} />
+                  <div>
+                    <h3 className="text-base font-black text-slate-205">Dataset Sanitize & Audit Completed</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Your data pipeline checks have been completed with validation passes.</p>
                   </div>
                 </div>
-
-                {/* Columns count comparison */}
-                <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase mb-1">Columns count</span>
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="font-mono text-slate-400 line-through text-xs">{beforeStats?.cols}</span>
-                    <ArrowRight size={12} className="text-slate-500" />
-                    <span className="font-mono font-black text-cyan-300 text-sm">{initialCols}</span>
+                
+                {/* Score badge */}
+                {cleaningReport?.final_assessment && (
+                  <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl">
+                    <Sparkles className="text-emerald-400" size={15} />
+                    <div className="text-right">
+                      <span className="text-[9px] text-slate-500 font-bold block uppercase">Quality Score</span>
+                      <span className="text-xs font-mono font-black text-emerald-400">
+                        {cleaningReport.profiling.initial_quality_score} → {cleaningReport.final_assessment.final_quality_score} 
+                        {cleaningReport.final_assessment.quality_gain > 0 && ` (+${cleaningReport.final_assessment.quality_gain})`}
+                      </span>
+                    </div>
                   </div>
-                </div>
-
-                {/* Duplicates comparison */}
-                <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase mb-1">Duplicates</span>
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="font-mono text-slate-400 line-through text-xs">{beforeStats?.duplicates}</span>
-                    <ArrowRight size={12} className="text-slate-500" />
-                    <span className="font-mono font-black text-emerald-400 text-sm">{duplicate_count}</span>
-                  </div>
-                </div>
-
-                {/* Missing values comparison */}
-                <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center flex flex-col justify-center">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase mb-1">Missing values</span>
-                  <div className="flex items-center justify-center gap-2.5">
-                    <span className="font-mono text-slate-400 line-through text-xs">{beforeStats?.missing}</span>
-                    <ArrowRight size={12} className="text-slate-500" />
-                    <span className="font-mono font-black text-emerald-400 text-sm">{initialMissingCount}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Actions List */}
-              <div className="mb-8">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Executed pipeline steps</h4>
-                {cleanSummary.length > 0 ? (
-                  <ul className="space-y-2">
-                    {cleanSummary.map((action, i) => (
-                      <li key={i} className="text-xs bg-slate-900/40 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center gap-3 text-slate-300 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                        <span>{action}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-xs text-slate-500 italic">No modifications were required for this dataset.</p>
                 )}
               </div>
+
+              {/* Sub-tabs selector */}
+              <div className="flex gap-4 border-b border-slate-900 pb-1 text-[10px] font-bold uppercase tracking-wider">
+                <button 
+                  onClick={() => setReportTab('overview')} 
+                  className={`pb-2 px-1 transition-all border-b-2 ${reportTab === 'overview' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-400'}`}
+                >
+                  Overview & Profiling
+                </button>
+                <button 
+                  onClick={() => setReportTab('issues')} 
+                  className={`pb-2 px-1 transition-all border-b-2 ${reportTab === 'issues' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-400'}`}
+                >
+                  Issue Diagnostics ({cleaningReport?.issue_detection?.length || 0})
+                </button>
+                <button 
+                  onClick={() => setReportTab('fixes')} 
+                  className={`pb-2 px-1 transition-all border-b-2 ${reportTab === 'fixes' ? 'text-indigo-400 border-indigo-500' : 'text-slate-500 border-transparent hover:text-slate-400'}`}
+                >
+                  Fixes & Validation
+                </button>
+              </div>
+
+              {/* Tab 1: Overview & Profiling */}
+              {reportTab === 'overview' && (
+                <div className="space-y-6 animate-fade-in">
+                  {/* Profiling Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Row Count</span>
+                      <span className="font-mono text-slate-400 line-through text-xs block">{cleaningReport?.profiling?.initial_rows || beforeStats?.rows}</span>
+                      <span className="font-mono font-black text-indigo-300 text-sm block mt-0.5">{initialRows}</span>
+                    </div>
+                    <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Columns</span>
+                      <span className="font-mono text-slate-400 line-through text-xs block">{cleaningReport?.profiling?.initial_cols || beforeStats?.cols}</span>
+                      <span className="font-mono font-black text-cyan-300 text-sm block mt-0.5">{initialCols}</span>
+                    </div>
+                    <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Duplicates</span>
+                      <span className="font-mono text-slate-400 line-through text-xs block">{cleaningReport?.profiling?.duplicate_rows_before || beforeStats?.duplicates}</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm block mt-0.5">{duplicate_count}</span>
+                    </div>
+                    <div className="p-4 bg-slate-900/30 border border-slate-850 rounded-xl text-center">
+                      <span className="text-[9px] text-slate-500 font-bold uppercase block mb-1">Missing Cells</span>
+                      <span className="font-mono text-slate-400 line-through text-xs block">{cleaningReport?.profiling?.missing_cells_before || beforeStats?.missing}</span>
+                      <span className="font-mono font-black text-emerald-400 text-sm block mt-0.5">{initialMissingCount}</span>
+                    </div>
+                  </div>
+
+                  {/* Automated Summary Checklist */}
+                  <div className="bg-slate-950/30 border border-slate-900 rounded-xl p-5 space-y-3">
+                    <h4 className="text-xs font-bold text-slate-350">Automated Pipeline Summary</h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      DataLens AI executed {cleanSummary.length} sanitization rule operations to optimize completeness, redundancy, and datatype consistency.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-2">
+                      <div className="flex items-center gap-2.5 text-xs text-slate-400 font-medium">
+                        <CheckCircle className="text-indigo-400" size={14} />
+                        <span>Duplicates dropped: {Math.max(0, (cleaningReport?.profiling?.duplicate_rows_before || beforeStats?.duplicates || 0) - (duplicate_count || 0))} rows</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 text-xs text-slate-400 font-medium">
+                        <CheckCircle className="text-indigo-400" size={14} />
+                        <span>Missing values resolved: {Math.max(0, (cleaningReport?.profiling?.missing_cells_before || beforeStats?.missing || 0) - (initialMissingCount || 0))} values</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tab 2: Issue Diagnostics */}
+              {reportTab === 'issues' && (
+                <div className="space-y-4 animate-fade-in">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Quality Audits & Root Cause Analysis</h4>
+                  {cleaningReport?.issue_detection && cleaningReport.issue_detection.length > 0 ? (
+                    <div className="border border-slate-900 rounded-xl overflow-hidden">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-slate-950/60 text-slate-400 border-b border-slate-900 font-bold uppercase text-[9px] tracking-wider">
+                            <th className="p-3">Column</th>
+                            <th className="p-3">Issue</th>
+                            <th className="p-3">Root Cause</th>
+                            <th className="p-3">Suggestion / Fix</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-900 text-slate-350">
+                          {cleaningReport.issue_detection.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-slate-900/10">
+                              <td className="p-3 font-mono font-bold text-indigo-300">{item.column}</td>
+                              <td className="p-3 font-semibold">
+                                <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  item.severity === 'high' ? 'bg-rose-500/10 text-rose-450 border border-rose-500/20' : 
+                                  item.severity === 'medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 
+                                  'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                                }`}>
+                                  {item.issue}
+                                </span>
+                              </td>
+                              <td className="p-3 text-slate-400 leading-normal max-w-[200px]">{item.root_cause}</td>
+                              <td className="p-3 text-slate-400 leading-normal max-w-[200px]">{item.suggestion}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic p-4 text-center bg-slate-900/10 border border-slate-900 rounded-xl">
+                      No issues detected in the initial profiling.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Tab 3: Fixes & Validation */}
+              {reportTab === 'fixes' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                  {/* Automated Fixes list */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Automated Fixes Applied</h4>
+                    {cleanSummary.length > 0 ? (
+                      <ul className="space-y-2">
+                        {cleanSummary.map((action, i) => (
+                          <li key={i} className="text-xs bg-slate-900/40 border border-slate-850 px-4 py-2.5 rounded-xl flex items-center gap-3 text-slate-300 font-medium">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span>{action}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">No modifications were required for this dataset.</p>
+                    )}
+                  </div>
+
+                  {/* Validation Pass checklist */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Pipeline Validation Pass</h4>
+                    {cleaningReport?.validation_pass && (
+                      <div className="space-y-3">
+                        <div className="p-3.5 bg-emerald-500/5 border border-emerald-500/10 rounded-xl flex items-center gap-3">
+                          <CheckCircle className="text-emerald-400" size={18} />
+                          <div>
+                            <span className="text-xs font-bold text-slate-200 block">Status: {cleaningReport.validation_pass.status}</span>
+                            <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                              Remaining issues: {cleaningReport.validation_pass.remaining_issues} flagged concerns.
+                            </span>
+                          </div>
+                        </div>
+
+                        <ul className="space-y-2">
+                          {cleaningReport.validation_pass.checks_run.map((check, idx) => (
+                            <li key={idx} className="flex items-center gap-2.5 text-xs text-slate-400">
+                              <span className="w-4 h-4 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-[9px]">
+                                ✓
+                              </span>
+                              <span>{check}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Download and navigation actions */}
               <div className="flex flex-col sm:flex-row gap-4 border-t border-slate-900 pt-6">
@@ -390,7 +526,16 @@ const Sanitizer = ({ isTabbed = false }) => {
                 </button>
 
                 <button
-                  onClick={() => setShowComparison(false)}
+                  onClick={() => {
+                    setShowComparison(false);
+                    // Clear state to let them re-configure if needed
+                    setActiveDataset({
+                      ...activeDataset,
+                      cleaningReport: null,
+                      status: 'analyzed'
+                    });
+                    setCleaningReport(null);
+                  }}
                   className="px-5 py-3 text-xs bg-slate-950 border border-slate-900 text-slate-500 hover:text-slate-400 hover:border-slate-800 rounded-xl font-bold uppercase tracking-wider transition-colors"
                 >
                   Modify Configs

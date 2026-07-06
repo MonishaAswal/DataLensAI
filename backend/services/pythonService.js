@@ -57,14 +57,15 @@ export const cleanDatasetFile = async (filePath, filename, options) => {
       throw new Error(`Python service cleaning failed: ${errorMsg}`);
     }
 
-    const cleanSummary = response.headers.get('X-Clean-Summary') || '';
-    
-    // Read response array buffer
-    const buffer = await response.arrayBuffer();
+    const responseData = await response.json();
+    const buffer = Buffer.from(responseData.cleaned_file_b64, 'base64');
+    const cleaningReport = responseData.report || {};
+    const cleanSummary = cleaningReport.automated_fixes || [];
     
     return {
-      buffer: Buffer.from(buffer),
-      cleanSummary: cleanSummary.split('; ').filter(Boolean),
+      buffer,
+      cleanSummary,
+      cleaningReport
     };
   } catch (error) {
     console.error('Error in pythonService/clean:', error.message);
