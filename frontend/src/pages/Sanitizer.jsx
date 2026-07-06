@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { datasetService, historyService } from '../services/api';
 import Layout from '../components/Layout';
@@ -19,7 +19,7 @@ import ImputationReport from '../components/ImputationReport';
 
 
 
-const Sanitizer = () => {
+const Sanitizer = ({ isTabbed = false }) => {
   const { activeDataset, setActiveDataset, user } = useAuth();
   
   // Cleaning Config states
@@ -37,13 +37,27 @@ const Sanitizer = () => {
   const [cleaningTab, setCleaningTab] = useState('standard'); // 'standard' or 'smart'
   const [smartImputationResult, setSmartImputationResult] = useState(null);
 
+  const wrapLayout = (el) => {
+    if (isTabbed) return el;
+    return <Layout>{el}</Layout>;
+  };
+
+  const prevDatasetIdRef = useRef(activeDataset?.id || activeDataset?._id);
+  useEffect(() => {
+    const currentId = activeDataset?.id || activeDataset?._id;
+    if (currentId !== prevDatasetIdRef.current) {
+      setShowComparison(false);
+      setCleanSummary([]);
+      setSmartImputationResult(null);
+      prevDatasetIdRef.current = currentId;
+    }
+  }, [activeDataset]);
+
   if (!activeDataset) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <p className="text-slate-400 italic">No dataset active in current workspace.</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <p className="text-slate-400 italic">No dataset active in current workspace.</p>
+      </div>
     );
   }
 
@@ -218,9 +232,8 @@ const Sanitizer = () => {
   };
 
 
-  return (
-    <Layout>
-      <div className="max-w-4xl mx-auto space-y-8">
+  return wrapLayout(
+    <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <h2 className="text-3xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2.5">
@@ -584,7 +597,6 @@ const Sanitizer = () => {
           </div>
         )}
       </div>
-    </Layout>
   );
 };
 

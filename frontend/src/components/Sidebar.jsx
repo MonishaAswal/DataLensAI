@@ -25,12 +25,12 @@ const Sidebar = () => {
 
   const navItems = [
     { path: '/upload', label: 'Upload Dataset', icon: Upload },
-    { path: '/overview', label: 'Dashboard', icon: LayoutDashboard, requiresDataset: true },
+    { path: '/overview', label: 'Dataset Overview', icon: LayoutDashboard, requiresDataset: true },
     { path: '/my-datasets', label: 'My Datasets', icon: Database },
-    { path: '/visualizations', label: 'Visualizations', icon: BarChart3, requiresDataset: true },
+    { path: '/visualizations', label: 'Visual Analytics', icon: BarChart3, requiresDataset: true },
     { path: '/ai-report', label: 'AI Insights', icon: Sparkles, requiresDataset: true },
-    { path: '/sanitizer', label: 'Dataset Sanitizer', icon: Wand2, requiresDataset: true },
-    { path: '/history', label: 'History', icon: History },
+    { path: '/sanitizer', label: 'Sanitization', icon: Wand2, requiresDataset: true },
+    { path: '/history', label: 'Reports', icon: History },
     { path: '/profile', label: 'Profile', icon: User },
   ];
 

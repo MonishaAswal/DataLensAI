@@ -19,12 +19,17 @@ import {
 
 import { historyService } from '../services/api';
 
-const HistoryPage = () => {
+const HistoryPage = ({ isTabbed = false }) => {
   const [historyList, setHistoryList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const wrapLayout = (el) => {
+    if (isTabbed) return el;
+    return <Layout>{el}</Layout>;
+  };
 
   // Modal Report state
   const [selectedReport, setSelectedReport] = useState(null);
@@ -99,8 +104,8 @@ const HistoryPage = () => {
     }
   };
 
-  return (
-    <Layout>
+  return wrapLayout(
+    <>
       <div className="max-w-5xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div>
@@ -342,7 +347,7 @@ const HistoryPage = () => {
           </div>
         </div>
       )}
-    </Layout>
+    </>
   );
 };
 

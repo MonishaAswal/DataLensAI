@@ -14,6 +14,7 @@ import Sanitizer from './pages/Sanitizer';
 import HistoryPage from './pages/History';
 import MyDatasets from './pages/MyDatasets';
 import Profile from './pages/Profile';
+import Workspace from './pages/Workspace';
 
 // Route Guard: Protected Routes for logged in users only
 const ProtectedRoute = ({ children }) => {
@@ -83,7 +84,7 @@ const App = () => {
             path="/overview" 
             element={
               <ProtectedRoute>
-                <Dashboard />
+                <Workspace activeTab="overview" />
               </ProtectedRoute>
             } 
           />
@@ -99,7 +100,7 @@ const App = () => {
             path="/visualizations" 
             element={
               <ProtectedRoute>
-                <Visualizations />
+                <Workspace activeTab="visualizations" />
               </ProtectedRoute>
             } 
           />
@@ -107,7 +108,7 @@ const App = () => {
             path="/ai-report" 
             element={
               <ProtectedRoute>
-                <AIReport />
+                <Workspace activeTab="ai-report" />
               </ProtectedRoute>
             } 
           />
@@ -115,7 +116,7 @@ const App = () => {
             path="/sanitizer" 
             element={
               <ProtectedRoute>
-                <Sanitizer />
+                <Workspace activeTab="sanitizer" />
               </ProtectedRoute>
             } 
           />
@@ -123,7 +124,7 @@ const App = () => {
             path="/history" 
             element={
               <ProtectedRoute>
-                <HistoryPage />
+                <Workspace activeTab="history" />
               </ProtectedRoute>
             } 
           />

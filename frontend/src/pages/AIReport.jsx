@@ -17,7 +17,7 @@ import {
   ShieldAlert 
 } from 'lucide-react';
 
-const AIReport = () => {
+const AIReport = ({ isTabbed = false }) => {
   const { activeDataset, setActiveDataset, user } = useAuth();
   const [report, setReport] = useState('');
   const [qualityScore, setQualityScore] = useState(null);
@@ -25,6 +25,11 @@ const AIReport = () => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+
+  const wrapLayout = (el) => {
+    if (isTabbed) return el;
+    return <Layout>{el}</Layout>;
+  };
 
   const fetchInsights = async (forceRegen = false) => {
     if (!activeDataset) return;
@@ -190,20 +195,17 @@ const AIReport = () => {
   };
 
   if (!activeDataset) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <p className="text-slate-405 italic">No dataset active in current workspace.</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <p className="text-slate-405 italic">No dataset active in current workspace.</p>
+      </div>
     );
   }
 
   const datasetNameStr = activeDataset.datasetName || activeDataset.originalName || 'Active Dataset';
 
-  return (
-    <Layout>
-      <div className="max-w-5xl mx-auto space-y-6">
+  return wrapLayout(
+    <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Title */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -376,7 +378,6 @@ const AIReport = () => {
           </div>
         )}
       </div>
-    </Layout>
   );
 };
 

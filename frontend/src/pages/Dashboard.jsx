@@ -17,13 +17,18 @@ import {
   X
 } from 'lucide-react';
 
-const Dashboard = () => {
+const Dashboard = ({ isTabbed = false }) => {
   const { activeDataset, setActiveDataset } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [overviewData, setOverviewData] = useState(null);
   const [isRenaming, setIsRenaming] = useState(false);
   const [tempName, setTempName] = useState('');
+
+  const wrapLayout = (el) => {
+    if (isTabbed) return el;
+    return <Layout>{el}</Layout>;
+  };
 
   useEffect(() => {
     const fetchOverview = async () => {
@@ -48,34 +53,28 @@ const Dashboard = () => {
   }, [activeDataset?._id]);
 
   if (loading) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
-          <Loader2 size={36} className="text-indigo-500 animate-spin" />
-          <p className="text-slate-400 text-sm font-semibold">Loading dataset overview details...</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
+        <Loader2 size={36} className="text-indigo-500 animate-spin" />
+        <p className="text-slate-400 text-sm font-semibold">Loading dataset overview details...</p>
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <Layout>
-        <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
-          <h4 className="text-rose-500 font-extrabold text-sm mb-2">Error Loading Overview</h4>
-          <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
+        <h4 className="text-rose-500 font-extrabold text-sm mb-2">Error Loading Overview</h4>
+        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
+      </div>
     );
   }
 
   if (!activeDataset || !overviewData) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <p className="text-slate-400 italic">No dataset active in current workspace.</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <p className="text-slate-400 italic">No dataset active in current workspace.</p>
+      </div>
     );
   }
 
@@ -124,9 +123,8 @@ const Dashboard = () => {
     minute: '2-digit'
   });
 
-  return (
-    <Layout>
-      <div className="space-y-8">
+  return wrapLayout(
+    <div className="space-y-8">
         {/* Header Title */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -363,7 +361,6 @@ const Dashboard = () => {
           />
         </div>
       </div>
-    </Layout>
   );
 };
 

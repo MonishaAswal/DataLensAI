@@ -41,7 +41,7 @@ import {
   Brain
 } from 'lucide-react';
 
-const Visualizations = () => {
+const Visualizations = ({ isTabbed = false }) => {
   const { activeDataset, user } = useAuth();
   const [activeTab, setActiveTab] = useState('distribution'); // 'distribution', 'correlation', 'missing', 'outliers'
   const [selectedCol, setSelectedCol] = useState('');
@@ -49,6 +49,20 @@ const Visualizations = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [visualizationData, setVisualizationData] = useState(null);
+
+  const wrapLayout = (el) => {
+    if (isTabbed) return el;
+    return <Layout>{el}</Layout>;
+  };
+
+  const prevDatasetIdRef = useRef(activeDataset?.id || activeDataset?._id);
+  useEffect(() => {
+    const currentId = activeDataset?.id || activeDataset?._id;
+    if (currentId !== prevDatasetIdRef.current) {
+      setSelectedCol('');
+      prevDatasetIdRef.current = currentId;
+    }
+  }, [activeDataset]);
 
   // Fetch visualizations statistics on mount
   useEffect(() => {
@@ -469,43 +483,36 @@ const Visualizations = () => {
   };
 
   if (loading) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
-          <Loader2 size={36} className="text-indigo-500 animate-spin" />
-          <p className="text-slate-400 text-sm font-semibold">Generating visual analytics charts...</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center space-y-4">
+        <Loader2 size={36} className="text-indigo-500 animate-spin" />
+        <p className="text-slate-400 text-sm font-semibold">Generating visual analytics charts...</p>
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <Layout>
-        <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
-          <h4 className="text-rose-400 font-extrabold text-sm mb-2">Error Loading Visualizations</h4>
-          <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="glass-card rounded-2xl p-8 border border-rose-500/20 bg-rose-500/5 text-center my-6">
+        <h4 className="text-rose-400 font-extrabold text-sm mb-2">Error Loading Visualizations</h4>
+        <p className="text-xs text-slate-400 max-w-md mx-auto mb-4">{error}</p>
+      </div>
     );
   }
 
   if (!activeDataset || !visualizationData) {
-    return (
-      <Layout>
-        <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
-          <p className="text-slate-400 italic">No dataset active in current workspace.</p>
-        </div>
-      </Layout>
+    return wrapLayout(
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <p className="text-slate-400 italic">No dataset active in current workspace.</p>
+      </div>
     );
   }
 
   const { correlationMatrix, missingAnalysis, outliersAnalysis } = visualizationData;
   const datasetDisplayName = activeDataset.datasetName || activeDataset.originalName || 'Active Dataset';
 
-  return (
-    <Layout>
-      <div className="space-y-8">
+  return wrapLayout(
+    <div className="space-y-8">
         {/* Header Title */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
@@ -873,7 +880,6 @@ const Visualizations = () => {
           </div>
         )}
       </div>
-    </Layout>
   );
 };
 

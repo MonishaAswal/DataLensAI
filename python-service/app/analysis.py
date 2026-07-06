@@ -336,36 +336,54 @@ def analyze_dataset(file_path: str) -> dict:
 
     # DYNAMIC QUALITY SCORE COMPUTATION
     total_cells = row_count * col_count if row_count > 0 and col_count > 0 else 1
+    
+    # 1. Null percentage / completeness (Up to -45 penalty)
     missing_pct = (total_missing / total_cells) * 100
-    missing_penalty = min(35.0, (missing_pct * 1.5)) # Up to -35
+    null_penalty = min(30.0, missing_pct * 3.0)
+    heavy_null_cols_count = sum(1 for col, m_info in missing_analysis.items() if m_info["percentage"] > 40.0)
+    heavy_null_penalty = min(15.0, heavy_null_cols_count * 5.0)
+    missing_values_penalty = float(round(null_penalty + heavy_null_penalty, 2))
     
+    # 2. Duplicate rows (Up to -25 penalty)
     dup_pct = (duplicate_count / row_count) * 100 if row_count > 0 else 0
-    duplicate_penalty = min(15.0, (dup_pct * 1.0)) # Up to -15
+    duplicates_penalty = float(round(min(25.0, dup_pct * 2.5), 2))
     
+    # 3. Outliers (Up to -20 penalty)
     outlier_pct = (total_outliers / total_cells) * 100
-    outliers_penalty = min(15.0, (outlier_pct * 2.0)) # Up to -15
+    outliers_penalty = float(round(min(20.0, outlier_pct * 5.5), 2))
     
-    constant_penalty = min(10.0, constant_cols_count * 4.0)
-    cardinality_penalty = min(8.0, high_cardinality_count * 1.5)
-    correlation_penalty = min(8.0, len(highly_correlated_pairs) * 1.0)
-    imbalance_penalty = min(8.0, (class_imbalances_count + invalid_dates_count) * 2.0)
-    suspicious_penalty = min(6.0, suspicious_cols_count * 2.0)
-    formatting_penalty = min(6.0, formatting_inconsistent_count * 2.0)
+    # 4. Constant columns (Up to -15 penalty)
+    constant_penalty = float(round(min(15.0, constant_cols_count * 5.0), 2))
     
-    raw_score = 100.0 - (missing_penalty + duplicate_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty + suspicious_penalty + formatting_penalty)
+    # 5. High Cardinality (Up to -10 penalty)
+    cardinality_penalty = float(round(min(10.0, high_cardinality_count * 2.5), 2))
+    
+    # 6. High Correlation (Up to -10 penalty)
+    correlation_penalty = float(round(min(10.0, len(highly_correlated_pairs) * 2.0), 2))
+    
+    # 7. Class Imbalance and Invalid Dates (Up to -20 penalty)
+    imbalance_penalty_val = min(10.0, class_imbalances_count * 3.5)
+    invalid_dates_penalty_val = min(10.0, invalid_dates_count * 5.0)
+    imbalance_penalty = float(round(imbalance_penalty_val + invalid_dates_penalty_val, 2))
+    
+    # 8. Suspicious names & Inconsistent formatting (Up to -15 penalty)
+    suspicious_penalty = min(8.0, suspicious_cols_count * 4.0)
+    formatting_penalty = min(8.0, formatting_inconsistent_count * 4.0)
+    formatting_issues_penalty = float(round(suspicious_penalty + formatting_penalty, 2))
+    
+    raw_score = 100.0 - (missing_values_penalty + duplicates_penalty + outliers_penalty + constant_penalty + cardinality_penalty + correlation_penalty + imbalance_penalty + formatting_issues_penalty)
     quality_score = max(0, min(100, int(raw_score)))
     
     quality_score_breakdown = {
         "score": quality_score,
-        "missing_values_penalty": float(round(missing_penalty, 2)),
-        "duplicates_penalty": float(round(duplicate_penalty, 2)),
-        "outliers_penalty": float(round(outliers_penalty, 2)),
-        "constant_columns_penalty": float(round(constant_penalty, 2)),
-        "cardinality_penalty": float(round(cardinality_penalty, 2)),
-        "correlation_penalty": float(round(correlation_penalty, 2)),
-        "imbalance_penalty": float(round(imbalance_penalty, 2)),
-        "suspicious_columns_penalty": float(round(suspicious_penalty, 2)),
-        "formatting_penalty": float(round(formatting_penalty, 2))
+        "missing_values_penalty": missing_values_penalty,
+        "duplicates_penalty": duplicates_penalty,
+        "outliers_penalty": outliers_penalty,
+        "constant_columns_penalty": constant_penalty,
+        "cardinality_penalty": cardinality_penalty,
+        "correlation_penalty": correlation_penalty,
+        "imbalance_penalty": imbalance_penalty,
+        "formatting_penalty": formatting_issues_penalty
     }
 
     # Row previews (First 20 rows, clean NaN to None so it can serialize to JSON)
