@@ -83,21 +83,6 @@ const Sidebar = () => {
       <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isDisabled = item.requiresDataset && !activeDataset;
-          
-          if (isDisabled) {
-            return (
-              <div
-                key={item.path}
-                className="flex items-center gap-3 px-3 py-2 text-xs text-slate-450 rounded-lg cursor-not-allowed select-none opacity-30 font-semibold"
-                title="Open a dataset workspace first"
-              >
-                <Icon size={14} />
-                <span>{item.label}</span>
-              </div>
-            );
-          }
-
           return (
             <NavLink
               key={item.path}
@@ -106,7 +91,7 @@ const Sidebar = () => {
                 `flex items-center gap-3 px-3 py-2 text-xs rounded-lg font-bold transition-all group ${
                   isActive
                     ? 'bg-slate-900 border-l-2 border-indigo-500 text-slate-101'
-                    : 'text-slate-450 hover:bg-slate-900/40 hover:text-slate-205'
+                    : 'text-slate-455 hover:bg-slate-900/40 hover:text-slate-205'
                 }`
               }
             >
