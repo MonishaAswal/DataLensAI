@@ -4,6 +4,11 @@
 @tailwind components;
 @tailwind utilities;
 
+body, html, #root {
+  background-color: #060608 !important;
+  color: #f4f4f5 !important;
+}
+
 @layer base {
   body {
     @apply bg-background text-slate-101 font-sans antialiased overflow-x-hidden;
@@ -15,6 +20,10 @@
       linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
     background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
     background-attachment: fixed;
+  }
+
+  input[type="text"], input[type="password"], input[type="email"], select, textarea {
+    @apply bg-slate-950 border border-slate-900 text-slate-101 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-550;
   }
 }
 
@@ -79,10 +88,7 @@
   @apply bg-slate-900/60 text-slate-450 border border-slate-800/80 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
-/* SaaS Form Controls customization */
-input[type="text"], input[type="password"], input[type="email"], select, textarea {
-  @apply bg-slate-950 border border-slate-900 text-slate-101 rounded-lg px-3 py-2 text-xs font-semibold focus:outline-none focus:border-indigo-500 transition-colors placeholder:text-slate-550;
-}
+
 
 .btn-primary {
   @apply bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider border border-indigo-500/10 active:scale-[0.98] transition-all;

@@ -48,8 +48,8 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative px-4 bg-background">
-      <div className="w-full max-w-md glass-card rounded-xl p-8 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col justify-center items-center py-12 px-4 bg-background relative">
+      <div className="w-full max-w-md glass-card rounded-lg p-8 relative overflow-hidden">
         {/* Brand Header */}
         <div className="flex flex-col items-center mb-6">
           <div className="bg-slate-900 border border-slate-800 p-3 rounded-lg text-white mb-3">
