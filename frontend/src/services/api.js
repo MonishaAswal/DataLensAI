@@ -6,6 +6,21 @@ if (base && !base.endsWith('/api') && !base.endsWith('/api/')) {
 }
 const API_BASE_URL = base;
 
+const fetchStorageFile = async (storageUrl) => {
+  let url = storageUrl;
+  if (storageUrl && storageUrl.includes('/uploads/')) {
+    const filename = storageUrl.split('/').pop().split('?')[0] || 'dataset.csv';
+    const backendRoot = API_BASE_URL.replace(/\/api\/?$/, '');
+    url = `${backendRoot}/uploads/${filename}`;
+  }
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch file from storage: ${response.statusText}`);
+  }
+  return response;
+};
+
+
 const api = axios.create({
   baseURL: API_BASE_URL,
 });
@@ -136,7 +151,7 @@ export const datasetService = {
    * Fetches the file blob from Storage, packages it with parameters, and triggers rules-based cleaning.
    */
   clean: async (storageUrl, options) => {
-    const fileRes = await fetch(storageUrl);
+    const fileRes = await fetchStorageFile(storageUrl);
     const fileBlob = await fileRes.blob();
     const filename = storageUrl.split('/').pop().split('?')[0] || 'dataset.csv';
 
@@ -163,7 +178,7 @@ export const datasetService = {
    * Fetches the file blob from Storage and triggers ML-based Smart AI Imputation.
    */
   smartImpute: async (storageUrl) => {
-    const fileRes = await fetch(storageUrl);
+    const fileRes = await fetchStorageFile(storageUrl);
     const fileBlob = await fileRes.blob();
     const filename = storageUrl.split('/').pop().split('?')[0] || 'dataset.csv';
 
@@ -190,7 +205,7 @@ export const datasetService = {
    * Directly downloads the file blob.
    */
   export: async (storageUrl) => {
-    const response = await fetch(storageUrl);
+    const response = await fetchStorageFile(storageUrl);
     return await response.blob();
   },
 
