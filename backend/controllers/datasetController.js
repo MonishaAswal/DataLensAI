@@ -1,11 +1,16 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import Dataset from '../models/Dataset.js';
 import {
   analyzeDatasetFile,
   cleanDatasetFile,
   generateAIReport
 } from '../services/pythonService.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDir = path.join(__dirname, '..', 'uploads');
 
 /**
  * @desc    Upload dataset, run initial EDA analysis, and save to MongoDB
@@ -94,7 +99,7 @@ export const cleanDataset = async (req, res) => {
 
     // Write cleaned buffer to a permanent output path
     const cleanedFilename = `cleaned-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalName)}`;
-    const cleanedFilePath = path.join('uploads', cleanedFilename);
+    const cleanedFilePath = path.join(uploadDir, cleanedFilename);
     
     await fs.promises.writeFile(cleanedFilePath, buffer);
 
