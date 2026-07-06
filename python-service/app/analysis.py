@@ -1,7 +1,94 @@
 import os
+import re
 import pandas as pd
 import numpy as np
 import warnings
+
+
+def classify_column_type(col_data: pd.Series, col_name: str, dtype_str: str, row_count: int) -> str:
+    """
+    Classify a DataFrame column into one of four semantic types:
+      - 'numeric'     : integer or float values
+      - 'date'        : date/time strings or datetime dtype
+      - 'long_text'   : free-form prose (job descriptions, comments, reviews)
+      - 'categorical' : short discrete text labels
+
+    Detection rules
+    ---------------
+    numeric:
+      pandas reports a numeric dtype (int, float, complex)
+
+    date:
+      (a) dtype is already datetime/timedelta, OR
+      (b) column name contains a known date keyword AND >=80% of non-null
+          values successfully parse as dates, OR
+      (c) >=90% of non-null values parse as dates (name-agnostic)
+
+    long_text:
+      The column dtype is object/string AND any ONE of:
+        (1) avg_char_length  > 60  (long average string)
+        (2) avg_word_count   > 6   (many words per cell)
+        (3) unique_ratio     > 0.8 AND avg_char_length > 30
+            (almost every cell is different + reasonably long)
+        (4) column name contains a long-text keyword:
+            description, comment, note, review, feedback,
+            text, content, body, message, summary, bio, detail
+
+    categorical:
+      everything else
+    """
+    # --- numeric ---
+    if pd.api.types.is_numeric_dtype(col_data):
+        return 'numeric'
+
+    # --- date ---
+    if pd.api.types.is_datetime64_any_dtype(col_data) or pd.api.types.is_timedelta64_dtype(col_data):
+        return 'date'
+
+    name_lower = col_name.lower()
+    date_keywords = ['date', 'time', 'created', 'updated', 'dob', 'birth', 'timestamp', 'datetime']
+    is_date_named = any(kw in name_lower for kw in date_keywords)
+
+    if dtype_str in ('object', 'string', 'category') and row_count > 0:
+        non_null = col_data.dropna()
+        if not non_null.empty:
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore')
+                    parsed = pd.Series(
+                        pd.to_datetime(non_null.astype(str), errors='coerce'),
+                        dtype='datetime64[ns]'
+                    )
+                valid_pct = parsed.notna().sum() / len(non_null)
+                if valid_pct >= 0.90 or (is_date_named and valid_pct >= 0.80):
+                    return 'date'
+            except Exception:
+                pass
+
+    # --- long_text vs categorical ---
+    if dtype_str in ('object', 'string', 'category') and row_count > 0:
+        non_null = col_data.dropna().astype(str)
+        if not non_null.empty:
+            avg_len  = non_null.str.len().mean()
+            avg_words = non_null.str.split().apply(len).mean()
+            unique_ratio = non_null.nunique() / len(non_null)
+
+            long_text_name_kw = [
+                'description', 'comment', 'note', 'review', 'feedback',
+                'text', 'content', 'body', 'message', 'summary', 'bio',
+                'detail', 'remark', 'reason', 'justification', 'abstract'
+            ]
+            has_lt_name = any(kw in name_lower for kw in long_text_name_kw)
+
+            if (
+                avg_len > 60
+                or avg_words > 6
+                or (unique_ratio > 0.8 and avg_len > 30)
+                or has_lt_name
+            ):
+                return 'long_text'
+
+    return 'categorical'
 
 def load_dataframe(file_path: str) -> pd.DataFrame:
     """
@@ -85,11 +172,13 @@ def analyze_dataset(file_path: str) -> dict:
         col_data = df[col]
         col_type = dtypes_dict[col]
         
-        # Determine if numeric
-        is_numeric = pd.api.types.is_numeric_dtype(col_data)
-        
+        # Determine column classification (numeric / date / long_text / categorical)
+        col_class = classify_column_type(col_data, col, col_type, row_count)
+        is_numeric = col_class == 'numeric'
+
         summary: dict = {
-            "type": "numeric" if is_numeric else "categorical",
+            "type": "numeric" if is_numeric else col_class,
+            "column_class": col_class,
             "unique_count": unique_counts[col],
             "missing_count": missing_analysis[col]["count"]
         }
@@ -168,7 +257,7 @@ def analyze_dataset(file_path: str) -> dict:
                     other_count = sum(val_list[10:])
                     dist_data.append({"category": "Other", "count": other_count})
                 distributions[col] = {
-                    "type": "categorical",
+                    "type": col_class,  # 'categorical', 'long_text', or 'date'
                     "data": dist_data
                 }
             else:
@@ -176,8 +265,40 @@ def analyze_dataset(file_path: str) -> dict:
                     "top": None,
                     "freq": 0
                 })
-                distributions[col] = {"type": "categorical", "data": []}
-                
+                distributions[col] = {"type": col_class, "data": []}
+
+        # For long_text and date columns, override the category distribution with
+        # a word-frequency / value-count that is still useful for charting.
+        if col_class == 'long_text':
+            non_null_text = col_data.dropna().astype(str)
+            if not non_null_text.empty:
+                # Build word-frequency for top-15 words (exclude very short stop-words)
+                STOPWORDS = {
+                    'the','a','an','and','or','but','in','on','at','to','for',
+                    'of','with','by','from','is','was','are','were','be','been',
+                    'as','that','this','it','its','i','we','he','she','they',
+                    'you','have','has','had','will','would','can','could','may',
+                    'might','do','did','not','no','so','if','then','than','also'
+                }
+                all_words = []
+                for val in non_null_text:
+                    words = re.findall(r"[a-zA-Z]{3,}", str(val).lower())
+                    all_words.extend(w for w in words if w not in STOPWORDS)
+                word_freq: dict = {}
+                for w in all_words:
+                    word_freq[w] = word_freq.get(w, 0) + 1
+                top_words = sorted(word_freq.items(), key=lambda x: x[1], reverse=True)[:15]
+                distributions[col] = {
+                    "type": "long_text",
+                    "data": [{"category": w, "count": c} for w, c in top_words],
+                    "avg_length": round(non_null_text.str.len().mean(), 1),
+                    "avg_words": round(non_null_text.str.split().apply(len).mean(), 1)
+                }
+                summary.update({
+                    "avg_length": round(non_null_text.str.len().mean(), 1),
+                    "avg_words": round(non_null_text.str.split().apply(len).mean(), 1)
+                })
+
         column_summaries[col] = summary
 
     # Data Quality Checks (Detect missing, duplicates, constant columns, high cardinality, high correlation, imbalance, suspicious cols, formatting inconsistency)

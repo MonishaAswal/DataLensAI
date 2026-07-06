@@ -38,7 +38,9 @@ const Visualizations = ({ isTabbed = false }) => {
   const { activeDataset, user } = useAuth();
   const [activeTab, setActiveTab] = useState('distribution'); // 'distribution', 'correlation', 'missing', 'outliers'
   const [selectedCol, setSelectedCol] = useState('');
-  const [selectedChartType, setSelectedChartType] = useState('bar');
+  const [selectedChartType, setSelectedChartType] = useState(() => {
+    return sessionStorage.getItem('lastSelectedChartType') || 'bar';
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [visualizationData, setVisualizationData] = useState(null);
@@ -132,46 +134,85 @@ const Visualizations = ({ isTabbed = false }) => {
     return distInfo?.type === 'numeric';
   }, [distInfo]);
 
+  // Derived column class from the Python backend classification
+  const colClass = useMemo(() => {
+    // Prefer distribution type as it is set by classify_column_type
+    if (distInfo?.type) return distInfo.type;
+    if (colSummary?.column_class) return colSummary.column_class;
+    return isNumericCol ? 'numeric' : 'categorical';
+  }, [distInfo, colSummary, isNumericCol]);
+
+  const isLongTextCol = useMemo(() => colClass === 'long_text', [colClass]);
+  const isDateCol     = useMemo(() => colClass === 'date',      [colClass]);
+
   // Dynamic Chart Recommendation Engine
   const recommendation = useMemo(() => {
-    if (!colSummary || !distInfo) return { type: 'bar', text: 'Bar Chart' };
+    if (!colSummary || !distInfo) return { type: 'bar', text: 'Bar Chart', reason: '' };
     const unique = colSummary.unique_count;
-    
+
+    if (isLongTextCol) {
+      return {
+        type: 'bar',
+        text: 'Word Frequency',
+        reason: 'Long-text column detected. Showing top word frequencies extracted from the text values.'
+      };
+    }
+    if (isDateCol) {
+      return {
+        type: 'column',
+        text: 'Column Chart',
+        reason: 'Date/time column. A column chart shows temporal value frequencies.'
+      };
+    }
     if (isNumericCol) {
       if (unique > 15) {
-        return { 
-          type: 'histogram', 
-          text: 'Histogram', 
-          reason: 'Continuous numeric column with high cardinality. Histogram best details frequencies across value ranges.' 
+        return {
+          type: 'histogram',
+          text: 'Histogram',
+          reason: 'Continuous numeric column with high cardinality. Histogram best details frequencies across value ranges.'
         };
       }
-      return { 
-        type: 'column', 
-        text: 'Column Chart', 
-        reason: 'Discrete numerical column with few values. Column chart compares values side by side.' 
+      return {
+        type: 'column',
+        text: 'Column Chart',
+        reason: 'Discrete numerical column with few values. Column chart compares values side by side.'
       };
     } else {
       if (unique > 0 && unique <= 6) {
-        return { 
-          type: 'pie', 
-          text: 'Pie Chart', 
-          reason: 'Categorical column with low cardinality. Pie chart effectively shows relative proportions.' 
+        return {
+          type: 'pie',
+          text: 'Pie Chart',
+          reason: 'Categorical column with low cardinality. Pie chart effectively shows relative proportions.'
         };
       }
-      return { 
-        type: 'bar', 
-        text: 'Bar Chart', 
-        reason: 'Categorical text column. Horizontal bar chart allows clean rendering of category labels.' 
+      return {
+        type: 'bar',
+        text: 'Bar Chart',
+        reason: 'Categorical text column. Horizontal bar chart allows clean rendering of category labels.'
       };
     }
-  }, [colSummary, distInfo, isNumericCol]);
+  }, [colSummary, distInfo, isNumericCol, isLongTextCol, isDateCol]);
 
-  // Set chart type automatically when column changes
+  // Save chart selection to sessionStorage for navigation persistence
+  const handleChartTypeChange = (type) => {
+    setSelectedChartType(type);
+    sessionStorage.setItem('lastSelectedChartType', type);
+  };
+
+  // Fundamentally incompatible checks — only fire when column changes (not on every chart pick)
   useEffect(() => {
-    if (recommendation) {
-      setSelectedChartType(recommendation.type);
+    if (!selectedCol) return;
+    // Boxplot requires numeric column. If chosen on categorical/long_text/date, fall back to bar
+    if (selectedChartType === 'boxplot' && !isNumericCol) {
+      setSelectedChartType('bar');
+      sessionStorage.setItem('lastSelectedChartType', 'bar');
     }
-  }, [selectedCol, recommendation]);
+    // Pie/line/area/scatter on long_text make no semantic sense — fall back to bar
+    if (isLongTextCol && ['pie', 'scatter', 'boxplot'].includes(selectedChartType)) {
+      setSelectedChartType('bar');
+      sessionStorage.setItem('lastSelectedChartType', 'bar');
+    }
+  }, [selectedCol, isNumericCol, isLongTextCol]); // intentionally exclude selectedChartType
 
   // Dynamic Text Insights Generator
   const columnInsights = useMemo(() => {
@@ -263,6 +304,118 @@ const Visualizations = ({ isTabbed = false }) => {
   };
 
   const renderActiveChart = () => {
+    // --- Long-text column: show word-frequency bar chart + stats banner ---
+    if (isLongTextCol) {
+      if (!distInfo || !distInfo.data || distInfo.data.length === 0) {
+        return (
+          <div className="flex flex-col items-center justify-center p-8 bg-amber-500/5 border border-amber-500/10 rounded-lg min-h-[200px] text-center gap-3">
+            <span className="text-2xl">📄</span>
+            <p className="text-amber-400 text-xs font-bold">Long-Text Column Detected</p>
+            <p className="text-slate-550 text-[11px] max-w-xs">
+              This column contains free-form prose (e.g. job descriptions, reviews, comments). Standard value-based charts are not applicable. No word data could be extracted.
+            </p>
+          </div>
+        );
+      }
+
+      const wordData = distInfo.data.map((item) => ({
+        name: item.category,
+        value: item.count
+      }));
+
+      // Only render bar/column/area/line for word-freq; block pie/scatter/boxplot
+      const allowedForLongText = ['bar', 'column', 'area', 'line'];
+      const chartTypeToRender = allowedForLongText.includes(selectedChartType) ? selectedChartType : 'bar';
+
+      const LongTextChart = () => {
+        if (chartTypeToRender === 'column' || chartTypeToRender === 'histogram') {
+          return (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={wordData} margin={{ top: 10, right: 10, left: -25, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                <XAxis dataKey="name" stroke="#52525b" fontSize={7} tickLine={false} angle={-35} textAnchor="end" interval={0} />
+                <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+                <Bar dataKey="value" fill="#f59e0b" radius={[2, 2, 0, 0]} name="Frequency">
+                  {wordData.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          );
+        }
+        if (chartTypeToRender === 'area') {
+          return (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={wordData} margin={{ top: 10, right: 10, left: -25, bottom: 40 }}>
+                <defs>
+                  <linearGradient id="ltAreaColor" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                <XAxis dataKey="name" stroke="#52525b" fontSize={7} tickLine={false} angle={-35} textAnchor="end" interval={0} />
+                <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+                <Area type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} fillOpacity={1} fill="url(#ltAreaColor)" name="Frequency" />
+              </AreaChart>
+            </ResponsiveContainer>
+          );
+        }
+        if (chartTypeToRender === 'line') {
+          return (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={wordData} margin={{ top: 10, right: 10, left: -25, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                <XAxis dataKey="name" stroke="#52525b" fontSize={7} tickLine={false} angle={-35} textAnchor="end" interval={0} />
+                <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
+                <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+                <Area type="monotone" dataKey="value" stroke="#f59e0b" strokeWidth={2} fill="none" name="Frequency" />
+              </AreaChart>
+            </ResponsiveContainer>
+          );
+        }
+        // default: horizontal bar (word frequency)
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={wordData} layout="vertical" margin={{ top: 5, right: 20, left: 60, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#18181b" horizontal={false} />
+              <XAxis type="number" stroke="#52525b" fontSize={8} tickLine={false} />
+              <YAxis type="category" dataKey="name" stroke="#52525b" fontSize={8} tickLine={false} width={55} />
+              <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
+              <Bar dataKey="value" fill="#f59e0b" radius={[0, 2, 2, 0]} name="Frequency">
+                {wordData.map((_, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      };
+
+      return (
+        <div className="flex flex-col gap-4 w-full h-full">
+          {/* Long-text notice banner */}
+          <div className="flex items-start gap-2 px-3 py-2 bg-amber-500/[0.04] border border-amber-500/15 rounded-lg text-[10px]">
+            <span className="text-amber-400 text-sm mt-0.5">📄</span>
+            <div>
+              <span className="font-bold text-amber-400 uppercase tracking-wide text-[8px] bg-amber-500/10 px-1.5 py-0.5 rounded mr-1.5">Long Text</span>
+              <span className="text-slate-350 font-semibold">Free-form text column detected.</span>
+              <span className="text-slate-550 ml-1">
+                Showing top-15 keyword frequencies (stop-words removed).
+                {distInfo.avg_length !== undefined && ` Avg length: ${distInfo.avg_length} chars, ${distInfo.avg_words} words/entry.`}
+              </span>
+            </div>
+          </div>
+          <div className="flex-1 min-h-[220px]">
+            <LongTextChart />
+          </div>
+        </div>
+      );
+    }
+
     if (!distInfo || !distInfo.data || distInfo.data.length === 0) {
       return (
         <div className="flex items-center justify-center p-8 bg-slate-950 border border-slate-900 rounded-lg min-h-[200px]">
@@ -560,22 +713,40 @@ const Visualizations = ({ isTabbed = false }) => {
               </h4>
               
               <div className="space-y-0.5 overflow-y-auto max-h-[350px] pr-1">
-                {columns.map((col) => (
-                  <button
-                    key={col.name}
-                    onClick={() => setSelectedCol(col.name)}
-                    className={`w-full text-left px-3 py-1.5 rounded-md text-xs font-bold flex items-center justify-between border transition-all ${
-                      selectedCol === col.name
-                        ? 'bg-slate-900 border-l-2 border-indigo-500 text-indigo-400'
-                        : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-950 hover:text-slate-300'
-                    }`}
-                  >
-                    <span className="truncate max-w-[130px]">{col.name}</span>
-                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-950 border border-slate-900 text-slate-500 uppercase tracking-widest font-mono">
-                      {col.type}
-                    </span>
-                  </button>
-                ))}
+                {columns.map((col) => {
+                  // Resolve the column class for badge colouring
+                  const colDist = visualizationData?.distributions?.[col.name];
+                  const colSum  = activeDataset?.edaResults?.column_summaries?.[col.name];
+                  const cls = colDist?.type || colSum?.column_class || (
+                    col.type?.includes('int') || col.type?.includes('float') ? 'numeric' : 'categorical'
+                  );
+                  const badgeStyle = {
+                    numeric:     'text-indigo-400 bg-indigo-500/10 border-indigo-500/15',
+                    categorical: 'text-purple-400 bg-purple-500/10 border-purple-500/15',
+                    long_text:   'text-amber-400  bg-amber-500/10  border-amber-500/15',
+                    date:        'text-emerald-400 bg-emerald-500/10 border-emerald-500/15',
+                  }[cls] || 'text-slate-500 bg-slate-950 border-slate-900';
+                  const badgeLabel = {
+                    numeric: 'num', categorical: 'cat', long_text: 'text', date: 'date'
+                  }[cls] || cls;
+
+                  return (
+                    <button
+                      key={col.name}
+                      onClick={() => setSelectedCol(col.name)}
+                      className={`w-full text-left px-3 py-1.5 rounded-md text-xs font-bold flex items-center justify-between border transition-all ${
+                        selectedCol === col.name
+                          ? 'bg-slate-900 border-l-2 border-indigo-500 text-indigo-400'
+                          : 'bg-transparent border-transparent text-slate-450 hover:bg-slate-950 hover:text-slate-300'
+                      }`}
+                    >
+                      <span className="truncate max-w-[110px]">{col.name}</span>
+                      <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-widest font-mono ${badgeStyle}`}>
+                        {badgeLabel}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -594,16 +765,16 @@ const Visualizations = ({ isTabbed = false }) => {
                     <span className="text-[9px] font-bold text-slate-550 uppercase tracking-wider">Chart:</span>
                     <select
                       value={selectedChartType}
-                      onChange={e => setSelectedChartType(e.target.value)}
+                      onChange={e => handleChartTypeChange(e.target.value)}
                       className="bg-slate-950 border border-slate-900 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-350 focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="bar">Bar (Horizontal)</option>
-                      <option value="column">Column (Vertical)</option>
-                      <option value="pie">Pie Chart</option>
+                      <option value="bar">Bar (Horizontal){isLongTextCol ? ' — Word Freq' : ''}</option>
+                      <option value="column">Column (Vertical){isLongTextCol ? ' — Word Freq' : ''}</option>
+                      <option value="pie"    disabled={isLongTextCol}>Pie Chart{isLongTextCol ? ' (N/A for text)' : ''}</option>
                       <option value="line">Line Chart</option>
                       <option value="area">Area Chart</option>
-                      <option value="scatter">Scatter Plot</option>
-                      <option value="boxplot">Box Plot</option>
+                      <option value="scatter" disabled={isLongTextCol || !isNumericCol}>Scatter Plot{(!isNumericCol || isLongTextCol) ? ' (numeric only)' : ''}</option>
+                      <option value="boxplot" disabled={!isNumericCol}>Box Plot{!isNumericCol ? ' (numeric only)' : ''}</option>
                     </select>
 
                     <button
