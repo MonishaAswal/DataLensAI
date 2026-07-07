@@ -69,11 +69,16 @@ class MockQuery {
 const userMethods = {
   findOne: (filter) => {
     const data = readData();
-    const filterEmail = String(filter.email || '').toLowerCase().trim();
-    const user = data.users.find(u => String(u.email || '').toLowerCase().trim() === filterEmail);
+    let user = null;
+    if (filter.email) {
+      const filterEmail = String(filter.email || '').toLowerCase().trim();
+      user = data.users.find(u => String(u.email || '').toLowerCase().trim() === filterEmail) || null;
+    } else if (filter._id) {
+      user = data.users.find(u => u._id === String(filter._id)) || null;
+    }
     if (!user) return new MockQuery(null);
-    
-    // Add matchPassword instance method
+
+    // Attach matchPassword instance method
     const userObj = {
       ...user,
       matchPassword: async function(enteredPassword) {
@@ -82,20 +87,27 @@ const userMethods = {
     };
     return new MockQuery(userObj);
   },
-  
+
   findById: (id) => {
     const data = readData();
-    const user = data.users.find(u => u._id === id || u.id === id);
+    const strId = String(id || '');
+    const user = data.users.find(u => u._id === strId || u.id === strId) || null;
     if (!user) return new MockQuery(null);
-    return new MockQuery({ ...user });
+    const userObj = {
+      ...user,
+      matchPassword: async function(enteredPassword) {
+        return await bcrypt.compare(enteredPassword, this.password);
+      }
+    };
+    return new MockQuery(userObj);
   },
-  
+
   create: async (userData) => {
     const data = readData();
     // Pre-save hashing
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(userData.password, salt);
-    
+
     const newUser = {
       _id: crypto.randomUUID(),
       ...userData,
@@ -106,7 +118,7 @@ const userMethods = {
     };
     data.users.push(newUser);
     writeData(data);
-    
+
     return {
       ...newUser,
       matchPassword: async function(enteredPassword) {
