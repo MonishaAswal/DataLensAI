@@ -426,40 +426,88 @@ const Dashboard = ({ isTabbed = false }) => {
 
   useEffect(() => {
     const fetchOverview = async () => {
-      if (!activeDataset?._id) {
+      if (!activeDataset?._id && !activeDataset?.id) {
         setLoading(false);
         return;
       }
-      try {
+
+      const datasetId = activeDataset._id || activeDataset.id;
+
+      // If activeDataset already has edaResults (e.g. right after upload),
+      // seed overviewData immediately so the page renders at once.
+      // getOverview will still run in background to freshen the data.
+      if (activeDataset.edaResults || activeDataset.rowCount) {
+        const eda = activeDataset.edaResults || {};
+        const immediate = {
+          id: datasetId,
+          _id: datasetId,
+          originalName: activeDataset.originalName || activeDataset.datasetName || 'Dataset',
+          datasetName: activeDataset.datasetName || activeDataset.originalName || 'Dataset',
+          rowCount: activeDataset.rowCount || eda.dimensions?.rows || 0,
+          columnCount: activeDataset.columnCount || eda.dimensions?.columns || 0,
+          size: activeDataset.size || 0,
+          duplicateCount: eda.duplicateCount || eda.duplicate_count || 0,
+          missingValueCount: activeDataset.missingValueCount ||
+            (eda.missing_analysis
+              ? Object.values(eda.missing_analysis).reduce((acc, curr) => acc + (curr.count || 0), 0)
+              : 0),
+          qualityScore: eda.quality_score || activeDataset.qualityScore || 85,
+          qualityScoreBreakdown: eda.quality_score_breakdown || {},
+          columns: activeDataset.columns || eda.columns || [],
+          previewRows: eda.preview_rows || eda.previewRows || [],
+          cleaningActions: activeDataset.cleaningActions || [],
+          createdAt: activeDataset.createdAt || new Date().toISOString(),
+          data_quality_issues: eda.data_quality_issues || [],
+        };
+        setOverviewData(immediate);
+        setLoading(false); // render immediately, no black screen
+      } else {
         setLoading(true);
+      }
+
+      // Always fetch fresh data from backend in the background
+      try {
         setError('');
-        const data = await datasetService.getOverview(activeDataset._id);
+        const data = await datasetService.getOverview(datasetId);
         setOverviewData(data);
       } catch (err) {
         console.error('Error fetching overview:', err);
-        setError(err.response?.data?.message || 'Failed to load dataset overview statistics.');
+        // Only show the error if we have nothing to show yet
+        if (!overviewData) {
+          setError(err.response?.data?.message || 'Failed to load dataset overview statistics.');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchOverview();
-  }, [activeDataset?._id]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDataset?._id, activeDataset?.id]);
 
-  if (loading) {
+  if (loading && !overviewData) {
     return wrapLayout(
-      <div className="flex flex-col items-center justify-center min-h-[350px] text-center space-y-4">
-        <Loader2 size={24} className="text-indigo-500 animate-spin" />
-        <p className="text-slate-455 text-xs font-semibold">Loading dataset analytics profile...</p>
+      <div className="glass-card rounded-xl border border-slate-900 p-12 flex flex-col items-center justify-center min-h-[380px] text-center space-y-4 animate-fade-in">
+        <div className="w-10 h-10 rounded-full border-4 border-slate-800 border-t-indigo-500 animate-spin" />
+        <div>
+          <p className="text-slate-350 text-sm font-bold">Loading Dataset Overview</p>
+          <p className="text-slate-550 text-xs mt-1">Compiling analytics profile...</p>
+        </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && !overviewData) {
     return wrapLayout(
-      <div className="glass-card rounded-lg p-8 border border-rose-500/10 bg-rose-500/5 text-center my-6">
+      <div className="glass-card rounded-lg p-8 border border-rose-500/10 bg-rose-500/5 text-center my-6 animate-fade-in">
         <h4 className="text-rose-455 font-bold text-xs mb-2">Error Loading Workspace</h4>
         <p className="text-[11px] text-slate-500 max-w-md mx-auto mb-4">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-3 py-1.5 bg-slate-900 border border-slate-800 text-slate-350 text-[10px] font-bold rounded-lg hover:bg-slate-850 transition-colors"
+        >
+          Retry
+        </button>
       </div>
     );
   }
