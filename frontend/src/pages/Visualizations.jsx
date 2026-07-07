@@ -34,6 +34,70 @@ import {
   Brain
 } from 'lucide-react';
 
+const truncateLabel = (label, maxLength = 18) => {
+  if (!label) return '';
+  if (label.length <= maxLength) return label;
+  return label.slice(0, maxLength) + '...';
+};
+
+const preparePieChartData = (data, isNumeric) => {
+  if (isNumeric) return data;
+  
+  // Sort descending by value (count)
+  const sortedData = [...data].sort((a, b) => b.value - a.value);
+  
+  if (sortedData.length <= 8) {
+    return sortedData;
+  }
+  
+  // Show top 7 categories and group the rest into "Other"
+  const topCategories = sortedData.slice(0, 7);
+  const otherCategories = sortedData.slice(7);
+  const otherValue = otherCategories.reduce((sum, item) => sum + item.value, 0);
+  
+  return [
+    ...topCategories,
+    {
+      name: 'Other',
+      value: otherValue,
+      isOther: true
+    }
+  ];
+};
+
+const renderCustomizedLabel = (props) => {
+  const { cx, cy, x, y, name, percent } = props;
+  const textAnchor = x > cx ? 'start' : 'end';
+  const displayPercent = percent !== undefined ? (percent * 100).toFixed(0) : 0;
+  const displayLabel = `${truncateLabel(name, 18)} (${displayPercent}%)`;
+  
+  return (
+    <text
+      x={x}
+      y={y}
+      fill="#a1a1aa"
+      textAnchor={textAnchor}
+      dominantBaseline="central"
+      className="text-[9px] sm:text-[10px] md:text-[11px] font-medium transition-all select-none"
+      style={{ pointerEvents: 'auto' }}
+    >
+      <title>{name}</title>
+      {displayLabel}
+    </text>
+  );
+};
+
+const renderLegendText = (value) => {
+  return (
+    <span 
+      title={value} 
+      className="text-[10px] font-medium text-slate-350 cursor-pointer hover:text-slate-100 transition-colors"
+    >
+      {truncateLabel(value, 20)}
+    </span>
+  );
+};
+
 const Visualizations = ({ isTabbed = false }) => {
   const { activeDataset, user } = useAuth();
   const [activeTab, setActiveTab] = useState('distribution'); // 'distribution', 'correlation', 'missing', 'outliers'
@@ -467,7 +531,8 @@ const Visualizations = ({ isTabbed = false }) => {
     }
 
     switch (selectedChartType) {
-      case 'pie':
+      case 'pie': {
+        const pieData = preparePieChartData(chartData, isNumericCol);
         return (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -476,23 +541,27 @@ const Visualizations = ({ isTabbed = false }) => {
                 itemStyle={{ color: '#f4f4f5' }}
               />
               <Pie
-                data={chartData}
+                data={pieData}
                 dataKey="value"
                 nameKey="name"
                 cx="50%"
                 cy="50%"
-                outerRadius={80}
-                label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                labelLine={true}
+                outerRadius="55%"
+                label={renderCustomizedLabel}
+                labelLine={{ stroke: '#3f3f46', strokeWidth: 1 }}
               >
-                {chartData.map((entry, index) => (
+                {pieData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
-              <Legend wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} />
+              <Legend 
+                formatter={renderLegendText} 
+                wrapperStyle={{ fontSize: '9px', paddingTop: '10px' }} 
+              />
             </PieChart>
           </ResponsiveContainer>
         );
+      }
       case 'line':
         return (
           <ResponsiveContainer width="100%" height="100%">
