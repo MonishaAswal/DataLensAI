@@ -199,15 +199,15 @@ const Visualizations = ({ isTabbed = false }) => {
     sessionStorage.setItem('lastSelectedChartType', type);
   };
 
-  // Fundamentally incompatible checks — only fire when column changes (not on every chart pick)
+  // Fundamentally incompatible checks — only fire when column type changes
   useEffect(() => {
     if (!selectedCol) return;
-    // Boxplot requires numeric column. If chosen on categorical/long_text/date, fall back to bar
+    // Boxplot requires numeric column
     if (selectedChartType === 'boxplot' && !isNumericCol) {
       setSelectedChartType('bar');
       sessionStorage.setItem('lastSelectedChartType', 'bar');
     }
-    // Pie/line/area/scatter on long_text make no semantic sense — fall back to bar
+    // For long-text: block pie, scatter, boxplot — fall back to bar (word-freq)
     if (isLongTextCol && ['pie', 'scatter', 'boxplot'].includes(selectedChartType)) {
       setSelectedChartType('bar');
       sessionStorage.setItem('lastSelectedChartType', 'bar');
@@ -430,6 +430,41 @@ const Visualizations = ({ isTabbed = false }) => {
       value: item.count,
       index: idx
     }));
+
+    // ── Hard runtime guard ────────────────────────────────────────────────────
+    // Safety net: if any unsupported chart type reaches this point (e.g. via
+    // direct sessionStorage/URL manipulation), show a professional fallback.
+    // Never attempt to render a broken chart — never crash the app.
+    const blocked =
+      (isLongTextCol && ['pie', 'scatter', 'boxplot'].includes(selectedChartType)) ||
+      (['boxplot', 'scatter'].includes(selectedChartType) && !isNumericCol);
+
+    if (blocked) {
+      return (
+        <div className="flex flex-col items-center justify-center p-10 bg-rose-500/5 border border-rose-500/10 rounded-lg min-h-[220px] text-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-xl">⛔</div>
+          <div className="space-y-1.5">
+            <p className="text-rose-400 font-bold text-xs">Incompatible Chart Type</p>
+            <p className="text-slate-450 text-[11px] max-w-sm leading-relaxed">
+              This chart type cannot be generated for{' '}
+              <span className="text-slate-200 font-semibold">{selectedCol}</span> because
+              the selected column contains{' '}
+              {isLongTextCol
+                ? 'high-cardinality free-form text values'
+                : 'non-numeric data'}{' '}
+              that cannot be meaningfully visualized as a{' '}
+              <span className="text-slate-200 font-semibold capitalize">{selectedChartType} chart</span>.
+            </p>
+            <button
+              onClick={() => handleChartTypeChange('bar')}
+              className="mt-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[10px] font-bold text-slate-350 hover:text-slate-200 transition-colors"
+            >
+              {isLongTextCol ? 'Switch to Word Frequency Chart' : 'Switch to Bar Chart'}
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     switch (selectedChartType) {
       case 'pie':
@@ -763,19 +798,58 @@ const Visualizations = ({ isTabbed = false }) => {
                   {/* Chart Switcher */}
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-bold text-slate-550 uppercase tracking-wider">Chart:</span>
-                    <select
-                      value={selectedChartType}
-                      onChange={e => handleChartTypeChange(e.target.value)}
-                      className="bg-slate-950 border border-slate-900 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-350 focus:outline-none focus:border-indigo-500"
-                    >
-                      <option value="bar">Bar (Horizontal){isLongTextCol ? ' — Word Freq' : ''}</option>
-                      <option value="column">Column (Vertical){isLongTextCol ? ' — Word Freq' : ''}</option>
-                      <option value="pie"    disabled={isLongTextCol}>Pie Chart{isLongTextCol ? ' (N/A for text)' : ''}</option>
-                      <option value="line">Line Chart</option>
-                      <option value="area">Area Chart</option>
-                      <option value="scatter" disabled={isLongTextCol || !isNumericCol}>Scatter Plot{(!isNumericCol || isLongTextCol) ? ' (numeric only)' : ''}</option>
-                      <option value="boxplot" disabled={!isNumericCol}>Box Plot{!isNumericCol ? ' (numeric only)' : ''}</option>
-                    </select>
+
+                    {/* Custom button-group chart switcher with disabled states + hover tooltips */}
+                    <div className="flex flex-wrap gap-1" role="group" aria-label="Chart type selector">
+                      {[
+                        { value: 'bar',     label: isLongTextCol ? 'Word Freq' : 'Bar',     blockedForLT: false, blockedForNonNum: false },
+                        { value: 'column',  label: isLongTextCol ? 'Freq ↑'   : 'Column',  blockedForLT: false, blockedForNonNum: false },
+                        { value: 'line',    label: 'Line',    blockedForLT: false, blockedForNonNum: false },
+                        { value: 'area',    label: 'Area',    blockedForLT: false, blockedForNonNum: false },
+                        { value: 'pie',     label: 'Pie',     blockedForLT: true,  blockedForNonNum: false },
+                        { value: 'scatter', label: 'Scatter', blockedForLT: true,  blockedForNonNum: true  },
+                        { value: 'boxplot', label: 'Box',     blockedForLT: true,  blockedForNonNum: true  },
+                      ].map(({ value, label, blockedForLT, blockedForNonNum }) => {
+                        const isDisabledByLT  = isLongTextCol && blockedForLT;
+                        const isDisabledByNum = blockedForNonNum && !isNumericCol;
+                        const isDisabled      = isDisabledByLT || isDisabledByNum;
+                        const isActive        = selectedChartType === value;
+                        const tooltip = isDisabledByLT
+                          ? 'This visualization is not suitable for long-form text data.'
+                          : isDisabledByNum
+                            ? 'This chart type requires a numeric column.'
+                            : undefined;
+                        return (
+                          <div key={value} className="relative group">
+                            <button
+                              onClick={() => !isDisabled && handleChartTypeChange(value)}
+                              disabled={isDisabled}
+                              aria-pressed={isActive}
+                              title={isDisabled ? tooltip : undefined}
+                              className={[
+                                'px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider border transition-all select-none',
+                                isDisabled
+                                  ? 'opacity-30 cursor-not-allowed border-slate-900 bg-slate-950 text-slate-550'
+                                  : isActive
+                                    ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300 shadow-sm shadow-indigo-500/10'
+                                    : 'bg-slate-950 border-slate-900 text-slate-450 hover:bg-slate-900 hover:text-slate-250 hover:border-slate-800'
+                              ].join(' ')}
+                            >
+                              {label}
+                            </button>
+                            {/* Tooltip for disabled buttons */}
+                            {isDisabled && tooltip && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 pointer-events-none hidden group-hover:block">
+                                <div className="bg-slate-900 border border-slate-700 text-slate-300 text-[9px] font-medium px-2.5 py-1.5 rounded-lg shadow-2xl whitespace-nowrap max-w-[200px] text-center leading-snug">
+                                  {tooltip}
+                                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-700" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
 
                     <button
                       onClick={() => handleDownloadPNG('distribution-chart-container', `${selectedCol} Distribution`)}
