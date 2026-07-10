@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Brain, Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import { datasetService } from '../services/api';
 
-const SmartImputationPanel = ({ storageUrl, onImputationSuccess }) => {
+const SmartImputationPanel = ({ storageUrl, datasetId, onImputationSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showTooltip, setShowTooltip] = useState(false);
@@ -17,7 +17,7 @@ const SmartImputationPanel = ({ storageUrl, onImputationSuccess }) => {
     setError('');
     try {
       console.log(`[SmartImputationPanel] Triggering AI imputation for storageUrl: ${storageUrl}`);
-      const data = await datasetService.smartImpute(storageUrl);
+      const data = await datasetService.smartImpute(storageUrl, datasetId);
       console.log('[SmartImputationPanel] AI imputation complete:', data);
       
       if (onImputationSuccess) {

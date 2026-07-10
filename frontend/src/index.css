@@ -4,21 +4,89 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --background: #060608;
+  --cardBg: #09090b;
+  --borderBg: #18181b;
+  
+  --slate-50: #fafafa;
+  --slate-100: #f4f4f5;
+  --slate-101: #f4f4f5;
+  --slate-105: #f4f4f5;
+  --slate-150: #e4e4e7;
+  --slate-200: #e4e4e7;
+  --slate-202: #e4e4e7;
+  --slate-205: #d4d4d8;
+  --slate-250: #a1a1aa;
+  --slate-300: #d4d4d8;
+  --slate-350: #71717a;
+  --slate-355: #a1a1aa;
+  --slate-400: #a1a1aa;
+  --slate-450: #52525b;
+  --slate-455: #71717a;
+  --slate-500: #71717a;
+  --slate-550: #3f3f46;
+  --slate-555: #3f3f46;
+  --slate-600: #52525b;
+  --slate-650: #27272a;
+  --slate-655: #27272a;
+  --slate-700: #3f3f46;
+  --slate-800: #27272a;
+  --slate-850: #18181b;
+  --slate-900: #18181b;
+  --slate-950: #09090b;
+  --slate-955: #060608;
+}
+
+.light {
+  --background: #f8fafc; /* Sleek slate-white background */
+  --cardBg: #ffffff; /* Clean white card container */
+  --borderBg: #e2e8f0; /* Subtly thin border slate */
+  
+  /* Text colors: deep slate and gray */
+  --slate-50: #0f172a; 
+  --slate-101: #0f172a; /* Main text (dark slate) */
+  --slate-105: #0f172a;
+  --slate-150: #1e293b;
+  --slate-200: #1e293b;
+  --slate-202: #1e293b;
+  --slate-205: #334155;
+  --slate-250: #475569;
+  --slate-300: #334155;
+  --slate-350: #64748b; /* Secondary text */
+  --slate-355: #475569;
+  --slate-400: #475569;
+  --slate-450: #64748b; /* Muted text */
+  --slate-455: #64748b;
+  --slate-500: #64748b;
+  --slate-550: #94a3b8;
+  --slate-555: #94a3b8;
+  --slate-600: #94a3b8;
+  
+  /* Layout backgrounds */
+  --slate-650: #f1f5f9; /* Slate-100 active/hover */
+  --slate-655: #f1f5f9;
+  --slate-700: #cbd5e1; 
+  --slate-800: #e2e8f0; 
+  --slate-850: #e2e8f0;
+  --slate-900: #e2e8f0;
+  --slate-950: #ffffff; /* Inner input fields background */
+  --slate-955: #f1f5f9; /* Box backgrounds */
+}
+
 body, html, #root {
-  background-color: #060608 !important;
-  color: #f4f4f5 !important;
+  background-color: var(--background) !important;
+  color: var(--slate-101) !important;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 @layer base {
   body {
     @apply bg-background text-slate-101 font-sans antialiased overflow-x-hidden;
-    /* Clean SaaS background mesh grid pattern */
     background-image: 
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.03) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.02) 0px, transparent 50%),
-      linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
-    background-size: 100% 100%, 100% 100%, 32px 32px, 32px 32px;
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.015) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.005) 0px, transparent 50%);
+    background-size: 100% 100%, 100% 100%;
     background-attachment: fixed;
   }
 
@@ -27,18 +95,18 @@ body, html, #root {
   }
 }
 
-/* Custom scrollbars - Minimalist Linear style */
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #060608;
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.1);
+  background: var(--borderBg);
   border-radius: 4px;
 }
 
@@ -48,22 +116,22 @@ body, html, #root {
 
 /* Premium Vercel/Linear-inspired Flat Cards */
 .glass-card {
-  background: #09090b; /* Solid zinc-950 background */
-  border: 1px solid #18181b; /* Flat, thin zinc-900 border */
+  background: var(--cardBg);
+  border: 1px solid var(--borderBg);
   border-radius: 10px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .glass-card:hover {
-  border-color: #27272a; /* Glow/Highlight on hover (zinc-800) */
-  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+  border-color: var(--borderBg);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
 /* Flat Card without hover transitions */
 .static-card {
-  background: #09090b;
-  border: 1px solid #18181b;
+  background: var(--cardBg);
+  border: 1px solid var(--borderBg);
   border-radius: 10px;
 }
 
@@ -88,8 +156,6 @@ body, html, #root {
   @apply bg-slate-900/60 text-slate-450 border border-slate-800/80 px-2 py-0.5 rounded-md text-[9px] font-bold font-mono uppercase tracking-wider;
 }
 
-
-
 .btn-primary {
   @apply bg-indigo-650 hover:bg-indigo-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider border border-indigo-500/10 active:scale-[0.98] transition-all;
 }
@@ -108,7 +174,7 @@ body, html, #root {
 .animate-shimmer {
   position: relative;
   overflow: hidden;
-  background-color: #18181b;
+  background-color: var(--borderBg);
 }
 
 .animate-shimmer::after {
@@ -127,4 +193,128 @@ body, html, #root {
   );
   animation: shimmer 2s infinite;
   content: '';
+}
+
+/* Custom Light Mode Class overrides for direct styling robustness */
+.light .bg-background, .light body {
+  background-color: var(--background) !important;
+}
+
+.light aside.bg-cardBg, .light .bg-cardBg {
+  background-color: var(--cardBg) !important;
+}
+
+.light .bg-slate-955 {
+  background-color: var(--slate-955) !important;
+}
+
+.light .bg-slate-950, .light input[type="text"], .light select {
+  background-color: var(--slate-955) !important; /* Soft grey input container */
+}
+
+.light .bg-slate-900 {
+  background-color: var(--slate-650) !important; /* active item bg slate-100 */
+}
+
+.light .border-slate-900 {
+  border-color: var(--borderBg) !important;
+}
+
+.light .border-slate-800 {
+  border-color: var(--borderBg) !important;
+}
+
+.light .text-slate-101 {
+  color: var(--slate-101) !important;
+}
+
+.light .text-slate-202 {
+  color: var(--slate-202) !important;
+}
+
+.light .text-slate-205 {
+  color: var(--slate-205) !important;
+}
+
+.light .text-slate-300 {
+  color: var(--slate-150) !important;
+}
+
+.light .text-slate-350 {
+  color: var(--slate-350) !important;
+}
+
+.light .text-slate-450 {
+  color: var(--slate-350) !important; /* secondary gray */
+}
+
+.light .text-slate-455 {
+  color: var(--slate-350) !important;
+}
+
+.light .text-slate-550 {
+  color: var(--slate-400) !important;
+}
+
+/* Custom Light Mode hover overrides */
+.light .hover\:bg-slate-900:hover, 
+.light .hover\:bg-slate-900\/40:hover,
+.light .group:hover .group-hover\:bg-slate-900\/40 {
+  background-color: rgba(226, 232, 240, 0.8) !important;
+}
+
+.light .hover\:text-slate-205:hover,
+.light .hover\:text-slate-300:hover {
+  color: #0f172a !important;
+}
+
+.light .hover\:bg-slate-800:hover {
+  background-color: #cbd5e1 !important;
+}
+
+/* Heading element and table header cell light mode overrides */
+.light h1, .light h2, .light h3, .light h4, .light h5, .light h6 {
+  color: var(--slate-101) !important;
+}
+
+.light th {
+  color: var(--slate-205) !important;
+}
+
+.light thead tr, .light tr.bg-slate-955\/60, .light tr.bg-slate-950\/60 {
+  background-color: var(--slate-955) !important;
+  border-bottom: 1px solid var(--borderBg) !important;
+}
+
+/* Print layout overrides for clean window.print() reports */
+@media print {
+  aside,
+  button,
+  nav,
+  header,
+  .no-print,
+  .flex.gap-2.self-start.sm\:self-auto {
+    display: none !important;
+  }
+  
+  body, html, #root, main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    position: static !important;
+  }
+  
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .glass-card {
+    background: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    color: #000000 !important;
+  }
 }

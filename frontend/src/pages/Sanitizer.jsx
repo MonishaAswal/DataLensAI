@@ -90,11 +90,12 @@ const Sanitizer = ({ isTabbed = false }) => {
     });
 
     const options = {
-      remove_duplicates: removeDuplicates,
-      impute_numeric: imputeNumeric,
-      impute_categorical: imputeCategorical,
-      remove_empty_cols: removeEmptyCols,
-      standardize_dates: standardizeDates
+      removeDuplicates: removeDuplicates,
+      imputeNumeric: imputeNumeric,
+      imputeCategorical: imputeCategorical,
+      removeEmptyCols: removeEmptyCols,
+      standardizeDates: standardizeDates,
+      datasetId: activeDataset._id || activeDataset.id
     };
 
     try {
@@ -590,6 +591,7 @@ const Sanitizer = ({ isTabbed = false }) => {
                   /* Smart AI Imputation Panel */
                   <SmartImputationPanel 
                     storageUrl={activeDataset.storageUrl}
+                    datasetId={activeDataset._id || activeDataset.id}
                     onImputationSuccess={handleSmartImputationSuccess}
                   />
                 )}

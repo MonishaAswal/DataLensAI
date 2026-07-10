@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { authService, datasetService } from '../services/api';
+import { authService, datasetService, api } from '../services/api';
+import { useAuth as useClerkAuth, useUser as useClerkUser } from '@clerk/clerk-react';
 
 const AuthContext = createContext();
 
@@ -37,128 +38,122 @@ const loadMostRecentDataset = async () => {
 // ─── provider ───────────────────────────────────────────────────────────────
 
 export const AuthProvider = ({ children }) => {
+  const { isLoaded: isAuthLoaded, userId, getToken, signOut } = useClerkAuth();
+  const { isLoaded: isUserLoaded, user: clerkUser } = useClerkUser();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeDataset, setActiveDatasetState] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return localStorage.getItem('sidebarCollapsed') === 'true';
+  });
 
-  // On mount: rehydrate JWT session and restore workspace
+  const toggleSidebar = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebarCollapsed', String(next));
+      return next;
+    });
+  };
+
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'dark';
+  });
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem('theme', next);
+      return next;
+    });
+  };
+
   useEffect(() => {
-    const loadUser = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setUser(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const userData = await authService.getCurrentUser();
-        const activeUser = {
-          ...userData,
-          uid: userData._id || userData.id,
-          _id: userData._id || userData.id,
-        };
-        setUser(activeUser);
-
-        // Try sessionStorage first (same tab / page refresh)
-        const saved = sessionStorage.getItem('activeDataset');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            const datasetId = parsed._id || parsed.id;
-            if (datasetId) {
-              setActiveDatasetState(parsed); // show immediately without waiting
-              // Re-validate in background to keep data fresh
-              datasetService.getOverview(datasetId)
-                .then(fresh => {
-                  fresh.edaResults = fresh.edaResults || parsed.edaResults || {};
-                  setActiveDatasetState(fresh);
-                  sessionStorage.setItem('activeDataset', JSON.stringify(fresh));
-                })
-                .catch(() => {}); // keep cached version if refresh fails
-            } else {
-              throw new Error('Invalid cached dataset ID');
-            }
-          } catch {
-            sessionStorage.removeItem('activeDataset');
-          }
-        } else {
-          // Fresh login in a new tab/window — load from DB
-          try {
-            const dataset = await loadMostRecentDataset();
-            if (dataset) {
-              setActiveDatasetState(dataset);
-              sessionStorage.setItem('activeDataset', JSON.stringify(dataset));
-            }
-          } catch (err) {
-            console.warn('[AuthContext] Could not auto-load dataset on session restore:', err.message);
-          }
-        }
-      } catch (error) {
-        console.error('[AuthContext] Session validation failed:', error);
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('activeDataset');
-        setUser(null);
-      }
-
-      setLoading(false);
-    };
-
-    loadUser();
-  }, []);
-
-  // ── login ──────────────────────────────────────────────────────────────────
-  const login = async (email, password) => {
-    const responseData = await authService.login(email, password);
-
-    const activeUser = {
-      _id: responseData._id,
-      name: responseData.name,
-      email: responseData.email,
-      uid: responseData._id,
-    };
-    localStorage.setItem('token', responseData.token);
-    setUser(activeUser);
-
-    // Restore previous workspace: load and fully normalize the most recent dataset
-    let mostRecent = null;
-    try {
-      mostRecent = await loadMostRecentDataset();
-      if (mostRecent) {
-        setActiveDatasetState(mostRecent);
-        sessionStorage.setItem('activeDataset', JSON.stringify(mostRecent));
-      }
-    } catch (err) {
-      console.warn('[AuthContext] Could not restore workspace on login:', err.message);
+    if (theme === 'light') {
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
     }
+  }, [theme]);
 
-    return { user: activeUser, activeDataset: mostRecent };
+  // Bind the token getter to Axios
+  if (isAuthLoaded) {
+    api.getClerkToken = getToken;
+  }
+
+  // Handle Clerk auth status updates
+  useEffect(() => {
+    if (!isAuthLoaded || !isUserLoaded) return;
+
+    if (userId && clerkUser) {
+      const activeUser = {
+        _id: userId,
+        uid: userId,
+        name: clerkUser.fullName || clerkUser.username || clerkUser.primaryEmailAddress?.emailAddress?.split('@')[0] || 'User',
+        email: clerkUser.primaryEmailAddress?.emailAddress || '',
+      };
+      setUser(activeUser);
+
+      // Load active workspace
+      const saved = sessionStorage.getItem('activeDataset');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          const datasetId = parsed._id || parsed.id;
+          if (datasetId) {
+            setActiveDatasetState(parsed);
+            // Refresh in background
+            datasetService.getOverview(datasetId)
+              .then(fresh => {
+                fresh.edaResults = fresh.edaResults || parsed.edaResults || {};
+                setActiveDatasetState(fresh);
+                sessionStorage.setItem('activeDataset', JSON.stringify(fresh));
+              })
+              .catch((err) => {
+                console.warn('[AuthContext] Background refresh failed, clearing if 404:', err.message);
+                if (err.response && err.response.status === 404) {
+                  setActiveDataset(null);
+                }
+              });
+          }
+        } catch {
+          sessionStorage.removeItem('activeDataset');
+        }
+      } else {
+        loadMostRecentDataset().then(dataset => {
+          if (dataset) {
+            setActiveDatasetState(dataset);
+            sessionStorage.setItem('activeDataset', JSON.stringify(dataset));
+          }
+        }).catch(() => {});
+      }
+    } else {
+      setUser(null);
+      setActiveDatasetState(null);
+      sessionStorage.removeItem('activeDataset');
+    }
+    setLoading(false);
+  }, [isAuthLoaded, isUserLoaded, userId, clerkUser]);
+
+  // Login action (bridged to Clerk UI components)
+  const login = async (email, password) => {
+    console.warn('[AuthContext] login() called programmatically. Clerk authentication should be handled via the Clerk UI components.');
   };
 
-  // ── register ───────────────────────────────────────────────────────────────
+  // Register action (bridged to Clerk UI components)
   const register = async (name, email, password) => {
-    const responseData = await authService.register(name, email, password);
-    const activeUser = {
-      _id: responseData._id,
-      name: responseData.name,
-      email: responseData.email,
-      uid: responseData._id,
-    };
-    localStorage.setItem('token', responseData.token);
-    setUser(activeUser);
-    return activeUser;
+    console.warn('[AuthContext] register() called programmatically. Clerk registration should be handled via the Clerk UI components.');
   };
 
-  // ── logout ─────────────────────────────────────────────────────────────────
+  // Logout action
   const logout = async () => {
-    authService.logout();
+    await signOut();
     setUser(null);
     setActiveDatasetState(null);
     sessionStorage.removeItem('activeDataset');
     sessionStorage.removeItem('lastSelectedChartType');
   };
 
-  // ── setActiveDataset ───────────────────────────────────────────────────────
+  // Set active dataset
   const setActiveDataset = (dataset) => {
     setActiveDatasetState(dataset);
     if (dataset) {
@@ -168,7 +163,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── refreshActiveDataset ───────────────────────────────────────────────────
+  // Refresh active dataset
   const refreshActiveDataset = async () => {
     const datasetId = activeDataset?._id || activeDataset?.id;
     if (!datasetId) return;
@@ -179,6 +174,9 @@ export const AuthProvider = ({ children }) => {
       sessionStorage.setItem('activeDataset', JSON.stringify(updatedDataset));
     } catch (err) {
       console.error('[AuthContext] Error refreshing active dataset:', err);
+      if (err.response && err.response.status === 404) {
+        setActiveDataset(null);
+      }
     }
   };
 
@@ -194,6 +192,10 @@ export const AuthProvider = ({ children }) => {
         setActiveDataset,
         refreshActiveDataset,
         isAuthenticated: !!user,
+        sidebarCollapsed,
+        toggleSidebar,
+        theme,
+        toggleTheme,
       }}
     >
       {children}

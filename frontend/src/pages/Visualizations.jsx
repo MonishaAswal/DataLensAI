@@ -20,7 +20,8 @@ import {
   AreaChart,
   Area,
   ScatterChart,
-  Scatter
+  Scatter,
+  Brush
 } from 'recharts';
 import { 
   BarChart3, 
@@ -67,6 +68,12 @@ const preparePieChartData = (data, isNumeric) => {
 
 const renderCustomizedLabel = (props) => {
   const { cx, cy, x, y, name, percent } = props;
+  
+  // Hide labels for slices representing less than 5% to prevent overlapping clutter
+  if (percent !== undefined && percent < 0.05) {
+    return null;
+  }
+  
   const textAnchor = x > cx ? 'start' : 'end';
   const displayPercent = percent !== undefined ? (percent * 100).toFixed(0) : 0;
   const displayLabel = `${truncateLabel(name, 18)} (${displayPercent}%)`;
@@ -115,6 +122,7 @@ const Visualizations = ({ isTabbed = false }) => {
   };
 
   const prevDatasetIdRef = useRef(activeDataset?.id || activeDataset?._id);
+  const lastLoggedDatasetIdRef = useRef(null);
   useEffect(() => {
     const currentId = activeDataset?.id || activeDataset?._id;
     if (currentId !== prevDatasetIdRef.current) {
@@ -147,11 +155,13 @@ const Visualizations = ({ isTabbed = false }) => {
         };
         setVisualizationData(data);
 
-        // Save history log
-        if (user) {
+        // Save history log (only once per dataset in this view session)
+        const currentDatasetId = activeDataset.id || activeDataset._id;
+        if (user && lastLoggedDatasetIdRef.current !== currentDatasetId) {
+          lastLoggedDatasetIdRef.current = currentDatasetId;
           try {
             await historyService.createHistory({
-              datasetId: activeDataset.id || activeDataset._id,
+              datasetId: currentDatasetId,
               datasetName: activeDataset.datasetName || activeDataset.originalName || 'dataset.csv',
               operationType: 'Visualization Generation',
               report: 'Generated and viewed category distributions and Pearson correlation matrix.'
@@ -577,6 +587,9 @@ const Visualizations = ({ isTabbed = false }) => {
               <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
               <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
               <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fillOpacity={1} fill="url(#lineColor)" name="Count" />
+              {chartData.length > 10 && (
+                <Brush dataKey="name" height={20} stroke="#6366f1" fill="#09090b" startIndex={0} endIndex={Math.min(chartData.length - 1, 20)} tickFormatter={(val) => truncateLabel(val, 10)} />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         );
@@ -595,6 +608,9 @@ const Visualizations = ({ isTabbed = false }) => {
               <YAxis stroke="#52525b" fontSize={8} tickLine={false} />
               <Tooltip contentStyle={{ backgroundColor: '#09090b', borderColor: '#18181b', borderRadius: '6px' }} />
               <Area type="monotone" dataKey="value" stroke="#06b6d4" strokeWidth={1.5} fillOpacity={1} fill="url(#areaColor)" name="Count" />
+              {chartData.length > 10 && (
+                <Brush dataKey="name" height={20} stroke="#06b6d4" fill="#09090b" startIndex={0} endIndex={Math.min(chartData.length - 1, 20)} tickFormatter={(val) => truncateLabel(val, 10)} />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         );
@@ -705,6 +721,9 @@ const Visualizations = ({ isTabbed = false }) => {
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Bar>
+              {chartData.length > 10 && (
+                <Brush dataKey="name" height={20} stroke="#6366f1" fill="#09090b" startIndex={0} endIndex={Math.min(chartData.length - 1, 20)} tickFormatter={(val) => truncateLabel(val, 10)} />
+              )}
             </BarChart>
           </ResponsiveContainer>
         );

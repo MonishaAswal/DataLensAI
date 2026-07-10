@@ -80,13 +80,61 @@ const Upload = () => {
     if (!file || !user) return;
 
     setIsProcessing(true);
-    setProcessingStatus('Uploading and analyzing dataset...');
-    setUploadProgress(35);
+    setProcessingStatus('Uploading to Supabase Cloud Storage...');
+    setUploadProgress(20);
 
     try {
-      // Call backend upload
-      const savedDataset = await datasetService.upload(file);
-      setUploadProgress(80);
+      let savedDataset = null;
+
+      try {
+        console.log('[Upload] Attempting to upload to Supabase Cloud Storage...');
+        // 1. Import Supabase client dynamically
+        const { supabase } = await import('../services/supabase');
+        
+        const bucketName = import.meta.env.VITE_SUPABASE_BUCKET || 'Test_bucket';
+        const fileFolder = user.id || user._id || 'anonymous';
+        const uniqueFilename = `${Date.now()}_${file.name}`;
+        const filePath = `${fileFolder}/${uniqueFilename}`;
+        
+        setUploadProgress(40);
+        
+        // Upload to Supabase bucket
+        const { data, error } = await supabase.storage
+          .from(bucketName)
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+        
+        setUploadProgress(70);
+        
+        // Get public download URL
+        const { data: { publicUrl } } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(filePath);
+
+        console.log('[Upload] Supabase Cloud Storage upload successful. URL:', publicUrl);
+        setProcessingStatus('Invoking Cloud Analytics Engine...');
+        setUploadProgress(85);
+
+        // 2. Call backend upload with the cloud storageUrl
+        savedDataset = await datasetService.uploadCloud({
+          storageUrl: publicUrl,
+          originalName: file.name,
+          size: file.size
+        });
+      } catch (sbErr) {
+        console.warn('[Upload] Supabase Cloud Storage upload failed. Falling back to direct local server upload. Error:', sbErr);
+        setProcessingStatus('Supabase Storage unavailable. Falling back to direct local server storage...');
+        setUploadProgress(50);
+        
+        // Fallback: upload directly to backend
+        savedDataset = await datasetService.upload(file);
+      }
+
+      setUploadProgress(95);
 
       const activeDatasetPayload = {
         id: savedDataset._id,

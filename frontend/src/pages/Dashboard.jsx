@@ -21,7 +21,9 @@ import {
   Brain,
   Layers,
   FileSpreadsheet,
-  FileText
+  FileText,
+  History,
+  Trash2
 } from 'lucide-react';
 
 const Dashboard = ({ isTabbed = false }) => {
@@ -90,6 +92,11 @@ const Dashboard = ({ isTabbed = false }) => {
     try {
       setWorkspaceError('');
       await datasetService.deleteDataset(datasetId);
+      
+      if (activeDataset?._id === datasetId || activeDataset?.id === datasetId) {
+        setActiveDataset(null);
+      }
+      
       setUserDatasets(userDatasets.filter(d => d._id !== datasetId && d.id !== datasetId));
     } catch (err) {
       console.error('Failed to delete dataset:', err);

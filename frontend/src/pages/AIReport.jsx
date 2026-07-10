@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { datasetService, historyService } from '../services/api';
 import Layout from '../components/Layout';
@@ -13,7 +13,8 @@ import {
   HelpCircle, 
   CheckCircle, 
   BookOpen, 
-  ShieldAlert 
+  ShieldAlert,
+  Loader2
 } from 'lucide-react';
 
 const AIReport = ({ isTabbed = false }) => {
@@ -24,6 +25,8 @@ const AIReport = ({ isTabbed = false }) => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
+  
+  const fetchInProgress = useRef(false);
 
   const wrapLayout = (el) => {
     if (isTabbed) return el;
@@ -32,6 +35,8 @@ const AIReport = ({ isTabbed = false }) => {
 
   const fetchInsights = async (forceRegen = false) => {
     if (!activeDataset) return;
+    if (fetchInProgress.current) return;
+    fetchInProgress.current = true;
     
     setLoading(true);
     setError('');
@@ -92,6 +97,7 @@ const AIReport = ({ isTabbed = false }) => {
       const detailedError = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to communicate with AI Insights Engine.';
       setError(detailedError);
     } finally {
+      fetchInProgress.current = false;
       setLoading(false);
     }
   };
@@ -197,7 +203,7 @@ const AIReport = ({ isTabbed = false }) => {
   return wrapLayout(
     <div className="max-w-5xl mx-auto space-y-6">
         {/* Header Title */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 no-print">
           <div>
             <h2 className="text-2xl font-extrabold text-slate-101 tracking-tight flex items-center gap-2.5">
               <Sparkles className="text-indigo-400" size={24} />

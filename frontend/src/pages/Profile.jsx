@@ -24,7 +24,7 @@ import {
 import { datasetService, historyService } from '../services/api';
 
 const Profile = () => {
-  const { user, setActiveDataset } = useAuth();
+  const { user, activeDataset, setActiveDataset } = useAuth();
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState({
     datasetsCount: 0,
@@ -63,13 +63,46 @@ const Profile = () => {
     fetchMetrics();
   }, [user]);
 
+  const handleDeleteLog = async (e, id) => {
+    e.stopPropagation();
+    if (!window.confirm('Are you sure you want to permanently delete this operations audit record?')) {
+      return;
+    }
+
+    try {
+      await historyService.deleteHistory(id);
+      setHistoryList(prev => prev.filter(item => (item._id !== id && item.id !== id)));
+      setMetrics(prev => ({
+        ...prev,
+        historyCount: Math.max(0, prev.historyCount - 1)
+      }));
+    } catch (err) {
+      console.error('Failed to delete history log:', err);
+      alert('Failed to delete history log.');
+    }
+  };
+
   const handleDeleteDataset = async (e, datasetId) => {
     e.stopPropagation();
     if (!window.confirm('Are you sure you want to permanently delete this dataset? This cannot be undone.')) {
       return;
     }
+    console.log('[Profile Delete] Deleting datasetId:', datasetId);
+    console.log('[Profile Delete] Active dataset state:', activeDataset);
+    console.log('[Profile Delete] Active dataset keys:', {
+      _id: activeDataset?._id,
+      id: activeDataset?.id
+    });
     try {
       await datasetService.deleteDataset(datasetId);
+      
+      const isMatch = activeDataset?._id === datasetId || activeDataset?.id === datasetId;
+      console.log('[Profile Delete] Is active dataset a match for deletion?', isMatch);
+      if (isMatch) {
+        console.log('[Profile Delete] Calling setActiveDataset(null)');
+        setActiveDataset(null);
+      }
+      
       setDatasetsList(datasetsList.filter(d => d._id !== datasetId && d.id !== datasetId));
       setMetrics(prev => ({
         ...prev,
@@ -303,13 +336,22 @@ const Profile = () => {
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => handleOpenReportModal(item)}
-                        className="px-2.5 py-1 bg-slate-950 border border-slate-900 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/20 rounded text-[9px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1 flex-shrink-0"
-                      >
-                        <FileText size={10} />
-                        <span>Report</span>
-                      </button>
+                      <div className="inline-flex items-center gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={() => handleOpenReportModal(item)}
+                          className="px-2.5 py-1 bg-slate-950 border border-slate-900 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/20 rounded text-[9px] font-bold uppercase tracking-wider transition-colors flex items-center gap-1"
+                        >
+                          <FileText size={10} />
+                          <span>Report</span>
+                        </button>
+                        <button
+                          onClick={(e) => handleDeleteLog(e, item._id || item.id)}
+                          className="p-1 bg-slate-950 border border-slate-900 hover:border-rose-500/10 text-slate-550 hover:text-rose-450 rounded transition-colors"
+                          title="Delete activity log"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
                     </div>
                   );
                 })

@@ -1,5 +1,3 @@
-import axios from 'axios';
-
 let base = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 if (base && !base.endsWith('/api') && !base.endsWith('/api/')) {
   base = base.replace(/\/+$/, '') + '/api';
@@ -20,28 +18,85 @@ const fetchStorageFile = async (storageUrl) => {
   return response;
 };
 
+// Custom fetch wrapper matching the Axios interface to avoid memory/resource leaks
+export const api = {
+  getClerkToken: null,
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-});
-
-// Request Interceptor: Attach token if logged in
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+  request: async (url, options = {}) => {
+    const fullUrl = `${API_BASE_URL}${url}`;
+    const headers = options.headers || {};
+    
+    // Auto-detect JSON payloads
+    if (options.data && !(options.data instanceof FormData) && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
     }
-    return config;
+
+    // Attach Authorization header (Clerk first, then standard JWT fallback)
+    if (api.getClerkToken) {
+      try {
+        const token = await api.getClerkToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      } catch (err) {
+        console.error('[Clerk Fetch Interceptor] Failed to fetch token:', err);
+      }
+    } else {
+      const token = localStorage.getItem('token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
+
+    const fetchOptions = {
+      method: options.method || 'GET',
+      headers,
+    };
+
+    if (options.data) {
+      if (options.data instanceof FormData) {
+        fetchOptions.body = options.data;
+        // Do NOT set Content-Type header manually for FormData so browser computes boundary
+        delete headers['Content-Type'];
+      } else {
+        fetchOptions.body = JSON.stringify(options.data);
+      }
+    }
+
+    const response = await fetch(fullUrl, fetchOptions);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: errorText };
+      }
+      const error = new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      error.response = { status: response.status, data: errorData };
+      throw error;
+    }
+
+    const contentType = response.headers.get('Content-Type');
+    let parsedData = null;
+    if (contentType && contentType.includes('application/json')) {
+      parsedData = await response.json();
+    } else {
+      parsedData = await response.text();
+    }
+
+    return { data: parsedData };
   },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+
+  get: (url, options = {}) => api.request(url, { ...options, method: 'GET' }),
+  post: (url, data, options = {}) => api.request(url, { ...options, data, method: 'POST' }),
+  put: (url, data, options = {}) => api.request(url, { ...options, data, method: 'PUT' }),
+  delete: (url, options = {}) => api.request(url, { ...options, method: 'DELETE' }),
+};
 
 // Auth Services
 export const authService = {
-  // Legacy MongoDB auth methods (deprecated in favor of Firebase, but kept to prevent build imports breaking)
   register: async (name, email, password) => {
     const response = await api.post('/auth/register', { name, email, password });
     return response.data;
@@ -65,33 +120,27 @@ export const datasetService = {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await api.post('/dataset/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
+    const response = await api.post('/dataset/upload', formData);
+    return response.data;
+  },
+
+  uploadCloud: async ({ storageUrl, originalName, size }) => {
+    const response = await api.post('/dataset/upload', {
+      storageUrl,
+      originalName,
+      size
     });
     return response.data;
   },
 
-  /**
-   * Persists a file/blob on the backend server and returns the local download URL.
-   */
   persist: async (file) => {
     const formData = new FormData();
     formData.append('file', file);
     
-    const response = await api.post('/dataset/persist', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    });
+    const response = await api.post('/dataset/persist', formData);
     return response.data;
   },
 
-  /**
-   * Fetches metadata & statistical calculations of the active dataset.
-   * If backend fails, falls back to locally cached sessionStorage active dataset details.
-   */
   getOverview: async (datasetId) => {
     try {
       const response = await api.get(`/dataset/${datasetId}`);
@@ -117,9 +166,11 @@ export const datasetService = {
       };
     } catch (err) {
       console.warn('[api] Failed to fetch overview from backend, checking fallback:', err.message);
+      if (err.response && err.response.status === 404) {
+        throw err;
+      }
     }
     
-    // Offline / Error fallback
     const savedActiveDataset = sessionStorage.getItem('activeDataset');
     if (savedActiveDataset) {
       try {
@@ -153,9 +204,6 @@ export const datasetService = {
     throw new Error('Dataset overview could not be loaded.');
   },
 
-  /**
-   * Fetches the file blob from Storage, packages it with parameters, and triggers rules-based cleaning.
-   */
   clean: async (storageUrl, options) => {
     const fileRes = await fetchStorageFile(storageUrl);
     const fileBlob = await fileRes.blob();
@@ -172,77 +220,52 @@ export const datasetService = {
       formData.append('datasetId', options.datasetId);
     }
 
-    const response = await api.post('/dataset/clean', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    });
+    const response = await api.post('/dataset/clean', formData);
     return response.data;
   },
 
-  /**
-   * Fetches the file blob from Storage and triggers ML-based Smart AI Imputation.
-   */
-  smartImpute: async (storageUrl) => {
+  smartImpute: async (storageUrl, datasetId) => {
     const fileRes = await fetchStorageFile(storageUrl);
     const fileBlob = await fileRes.blob();
     const filename = storageUrl.split('/').pop().split('?')[0] || 'dataset.csv';
 
     const formData = new FormData();
     formData.append('file', fileBlob, filename);
+    if (datasetId) {
+      formData.append('datasetId', datasetId);
+    }
 
-    const response = await api.post('/imputation/smart', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    });
+    const response = await api.post('/imputation/smart', formData);
     return response.data;
   },
 
-  /**
-   * Statelessly posts dataset statistics to trigger report generation via Groq/Gemini.
-   */
   getInsights: async (datasetName, edaResults, datasetId) => {
     const response = await api.post('/dataset/insights', { datasetName, edaResults, datasetId });
     return response.data;
   },
 
-  /**
-   * Directly downloads the file blob.
-   */
   export: async (storageUrl) => {
     const response = await fetchStorageFile(storageUrl);
     return await response.blob();
   },
 
-  /**
-   * MongoDB REST CRUD: get all datasets for current user
-   */
   getDatasets: async () => {
     const response = await api.get('/dataset');
     return response.data;
   },
 
-  /**
-   * MongoDB REST CRUD: delete dataset by ID
-   */
   deleteDataset: async (id) => {
     const response = await api.delete(`/dataset/${id}`);
     return response.data;
   },
 
-  /**
-   * MongoDB REST CRUD: update dataset by ID
-   */
   updateDataset: async (id, data) => {
     const response = await api.put(`/dataset/${id}`, data);
     return response.data;
   },
 };
 
-/**
- * Analysis History Service (MongoDB logs)
- */
+// Analysis History Service (MongoDB logs)
 export const historyService = {
   getHistory: async () => {
     const response = await api.get('/history');
