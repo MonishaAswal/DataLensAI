@@ -72,4 +72,6 @@ router.route('/:id')
   .put(protect, updateDataset)
   .delete(protect, deleteDataset);
 
+router.post('/:id/clean', protect, cleanDataset);
+
 export default router;

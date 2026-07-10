@@ -9,6 +9,12 @@ def generate_ai_report(dataset_name: str, eda_stats: dict, api_key: str = None) 
     Uses the analyst-friendly structure and strictly aligns with actual dataset statistics.
     """
     try:
+        # Clear duplicate GROQ_BASE_URL pathing from environment to prevent SDK 404s
+        if "GROQ_BASE_URL" in os.environ:
+            val = os.environ["GROQ_BASE_URL"]
+            if val and "/openai/v1" in val:
+                del os.environ["GROQ_BASE_URL"]
+
         # Fetch API Key from parameter or environment
         groq_key = api_key or os.environ.get("GROQ_API_KEY")
         

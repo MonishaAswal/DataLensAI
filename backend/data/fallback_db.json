@@ -7,6 +7,94 @@
       "password": "$2a$10$/gWp.yD5u2xveUMgIjDd5.tuyRxhbFG5vZQek7XhT5R/hJ1jvp5Ay",
       "createdAt": "2026-07-05T15:34:59.162Z",
       "updatedAt": "2026-07-05T15:34:59.162Z"
+    },
+    {
+      "_id": "18b36a09-7e7b-432b-92e3-c47a3ebffc80",
+      "name": "API Test User",
+      "email": "testrun_1783512493087@datalens.ai",
+      "password": "$2a$10$TPnpsMMj1tVd.WDnDtwoJ.fxMsLd9bkAZcUEXo7eKRitqfpyh1qxm",
+      "createdAt": "2026-07-08T12:08:13.261Z",
+      "updatedAt": "2026-07-08T12:08:13.261Z"
+    },
+    {
+      "_id": "1e3430d5-a920-4b6a-8bb9-36c70359d08c",
+      "name": "Imputation Tester",
+      "email": "impute_test_1783512503612@datalens.ai",
+      "password": "$2a$10$FWCgsoXfOPF4dNeY3poUDudC8wbFLd8sKuKzX9jrjFLN8tbTHWOoy",
+      "createdAt": "2026-07-08T12:08:23.755Z",
+      "updatedAt": "2026-07-08T12:08:23.755Z"
+    },
+    {
+      "_id": "e6730fd2-c598-4f8c-9023-1cf170daba43",
+      "name": "API Test User",
+      "email": "testrun_1783513291841@datalens.ai",
+      "password": "$2a$10$BLe8cA/DFtr3Q2r0nabet.shHf886bUehnAMlM.qmDSaPqUasNMzG",
+      "createdAt": "2026-07-08T12:21:32.005Z",
+      "updatedAt": "2026-07-08T12:21:32.006Z"
+    },
+    {
+      "_id": "56c468b6-3441-4fff-aab9-0f4ce5475d10",
+      "name": "Imputation Tester",
+      "email": "impute_test_1783513294593@datalens.ai",
+      "password": "$2a$10$1yKjWm1/al9NCqhww3ghUuvmIvUobJidi1uIG7BySE31nP2/s.oGK",
+      "createdAt": "2026-07-08T12:21:34.737Z",
+      "updatedAt": "2026-07-08T12:21:34.737Z"
+    },
+    {
+      "_id": "46127c5a-ce9c-4a58-93dd-aeadcecdce64",
+      "name": "Aman Pandey",
+      "email": "amanpandey1782@gmail.com",
+      "password": "$2a$10$RxMHQgeH7KJacGCTm9CvBOJA3hvpRqXjg2LpKFWw31BK9PwM3liwi",
+      "createdAt": "2026-07-08T12:22:29.783Z",
+      "updatedAt": "2026-07-08T12:22:29.783Z"
+    },
+    {
+      "_id": "8d62ac68-7915-465c-a82f-0f05166f50e3",
+      "name": "API Test User",
+      "email": "testrun_1783513809089@datalens.ai",
+      "password": "$2a$10$Vp9/M1DqSaJD.3gmbyC90.ebC8tLqCa/jBeZpNqlua6xjRu2oOF9q",
+      "createdAt": "2026-07-08T12:30:09.253Z",
+      "updatedAt": "2026-07-08T12:30:09.253Z"
+    },
+    {
+      "_id": "b6b72b4c-9c2f-4a3b-b70b-55bf6491b3e6",
+      "name": "Imputation Tester",
+      "email": "impute_test_1783513812579@datalens.ai",
+      "password": "$2a$10$9DOi98VAz9SKBVJzcEUSvuN1bDc5uuiAvZQyipfe6v7GoQCQ6YgiW",
+      "createdAt": "2026-07-08T12:30:12.718Z",
+      "updatedAt": "2026-07-08T12:30:12.718Z"
+    },
+    {
+      "_id": "3f8a84cc-6922-4a74-afe0-039df3d9d456",
+      "name": "API Test User",
+      "email": "testrun_1783514290371@datalens.ai",
+      "password": "$2a$10$faGQnNsDNtuNjSmlRR5qm.aB51gUdOW8wzuLJo./h9Vcsz98TSN3u",
+      "createdAt": "2026-07-08T12:38:10.537Z",
+      "updatedAt": "2026-07-08T12:38:10.537Z"
+    },
+    {
+      "_id": "d09ad178-ee5a-4a90-b8dc-558d632686fc",
+      "name": "API Test User",
+      "email": "testrun_1783514533280@datalens.ai",
+      "password": "$2a$10$K.s4y8POM1/ijHaQkDMm9eotn0Z7hThT/KQAf8NS7lcT4mFxJf8je",
+      "createdAt": "2026-07-08T12:42:13.443Z",
+      "updatedAt": "2026-07-08T12:42:13.443Z"
+    },
+    {
+      "_id": "6e69b062-ac77-4257-b4dc-45b548a3a8fd",
+      "name": "Imputation Tester",
+      "email": "impute_test_1783514537038@datalens.ai",
+      "password": "$2a$10$Z2V56zyckQZP0QeE3h.Co.eWQ6DbKfVkBsjO//TKWz6Q/GDgSsoAK",
+      "createdAt": "2026-07-08T12:42:17.178Z",
+      "updatedAt": "2026-07-08T12:42:17.178Z"
+    },
+    {
+      "_id": "c23c0527-5d7e-4dd5-a84f-1d682839b7b6",
+      "name": "API Test User",
+      "email": "testrun_1783514993561@datalens.ai",
+      "password": "$2a$10$ShU9Ri8KbnVfli7JGV0sz.h/h5Tcph8QHAyZ6fc7cXF0figbonT0K",
+      "createdAt": "2026-07-08T12:49:53.718Z",
+      "updatedAt": "2026-07-08T12:49:53.718Z"
     }
   ],
   "datasets": [

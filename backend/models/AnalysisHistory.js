@@ -3,13 +3,11 @@ import mongoose from 'mongoose';
 const analysisHistorySchema = new mongoose.Schema(
   {
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      type: String,
       required: true,
     },
     datasetId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Dataset',
+      type: String,
       required: true,
     },
     datasetName: {

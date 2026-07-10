@@ -1,44 +1,28 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { ClerkExpressWithAuth } from '@clerk/clerk-sdk-node';
 
 /**
- * Middleware to protect API routes by verifying the local JWT token signed with JWT_SECRET
+ * Middleware to protect API routes by verifying the Clerk session JWT
  */
 export const protect = async (req, res, next) => {
-  let token;
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
-    try {
-      // Extract JWT Token
-      token = req.headers.authorization.split(' ')[1];
-
-      // Verify token signature
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'datalenssecret123456789!');
-
-      if (!decoded || !decoded.id) {
-        return res.status(401).json({ message: 'Not authorized, invalid token structure.' });
-      }
-
-      // Fetch user from MongoDB
-      const user = await User.findById(decoded.id).select('-password');
-      if (!user) {
-        return res.status(401).json({ message: 'Not authorized, user not found.' });
-      }
-
-      // Populate req.user using MongoDB User document
-      req.user = user;
-
-      next();
-    } catch (error) {
-      console.error('[AuthMiddleware] Verification failed:', error.message);
+  // Use Clerk's built-in Express session verifier middleware
+  ClerkExpressWithAuth()(req, res, async (err) => {
+    if (err) {
+      console.error('[Clerk AuthMiddleware] Token verification exception:', err);
       return res.status(401).json({ message: 'Not authorized, token validation failed.' });
     }
-  }
 
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token provided.' });
-  }
+    if (!req.auth || !req.auth.userId) {
+      console.warn('[Clerk AuthMiddleware] Unauthenticated access blocked.');
+      return res.status(401).json({ message: 'Not authorized, no active Clerk session found.' });
+    }
+
+    // Map req.user to match expected user ID format in controllers
+    req.user = {
+      _id: req.auth.userId,
+      id: req.auth.userId,
+      clerkId: req.auth.userId,
+    };
+
+    next();
+  });
 };

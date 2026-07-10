@@ -6,6 +6,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 import pandas as pd
 import io
 
@@ -33,7 +34,7 @@ app.add_middleware(
 class ReportRequest(BaseModel):
     dataset_name: str
     eda_stats: dict
-    api_key: str = None
+    api_key: Optional[str] = None
 
 @app.get("/health")
 def health_check():
@@ -337,6 +338,11 @@ def test_groq(api_key: str = Query(None)):
     """
     Diagnostic endpoint to test raw Groq connectivity.
     """
+    if "GROQ_BASE_URL" in os.environ:
+        val = os.environ["GROQ_BASE_URL"]
+        if val and "/openai/v1" in val:
+            del os.environ["GROQ_BASE_URL"]
+
     groq_key = api_key or os.environ.get("GROQ_API_KEY")
     print(f"[test-groq] Invoked. Detected API key: {groq_key[:5] if groq_key else 'None'}...")
     if not groq_key:

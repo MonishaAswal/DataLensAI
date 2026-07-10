@@ -120,30 +120,33 @@ async function main() {
 
   // 4. Get Dataset Overview
   try {
-    const { status, data } = await getJson(`/api/dataset/${datasetId}/overview`, token);
+    const { status, data } = await getJson(`/api/dataset/${datasetId}`, token);
     if (status !== 200) throw new Error(data.message);
-    log(`Got dataset overview details`, {
+    const eda = data.edaResults || {};
+    const missingValueCount = eda.missing_analysis ? Object.values(eda.missing_analysis).reduce((acc, curr) => acc + (curr.count || 0), 0) : 0;
+    log(`Got dataset details`, {
       id: data._id,
       originalName: data.originalName,
       rowCount: data.rowCount,
       columnCount: data.columnCount,
-      qualityScore: data.qualityScore,
-      duplicateCount: data.duplicateCount,
-      missingValueCount: data.missingValueCount
+      qualityScore: eda.quality_score || 85,
+      duplicateCount: eda.duplicate_count || 0,
+      missingValueCount
     });
   } catch (err) {
-    logErr('Get Dataset Overview failed', err);
+    logErr('Get Dataset details failed', err);
   }
 
-  // 5. Get Dataset Visualizations
+  // 5. Get Dataset Visualizations (from cached edaResults)
   try {
-    const { status, data } = await getJson(`/api/dataset/${datasetId}/visualizations`, token);
+    const { status, data } = await getJson(`/api/dataset/${datasetId}`, token);
     if (status !== 200) throw new Error(data.message);
+    const eda = data.edaResults || {};
     log(`Got dataset visualizations details`, {
-      hasCorrelation: !!data.correlationMatrix,
-      hasDistributions: !!data.distributions,
-      missingValuesCount: data.missingValues?.length,
-      outliersCount: data.outliers?.length
+      hasCorrelation: !!eda.correlation_matrix,
+      hasDistributions: !!eda.distributions,
+      missingValuesCount: eda.missing_analysis ? Object.keys(eda.missing_analysis).length : 0,
+      outliersCount: eda.outliers_analysis ? Object.keys(eda.outliers_analysis).length : 0
     });
   } catch (err) {
     logErr('Get Dataset Visualizations failed', err);
@@ -151,9 +154,9 @@ async function main() {
 
   // 6. Get History
   try {
-    const { status, data } = await getJson('/api/dataset/history', token);
+    const { status, data } = await getJson('/api/history', token);
     if (status !== 200) throw new Error(data.message);
-    log(`History loaded: ${data.length} dataset(s) found`);
+    log(`History loaded: ${data.length} audit log(s) found`);
   } catch (err) {
     logErr('History fetch failed', err);
   }
@@ -167,11 +170,11 @@ async function main() {
     if (status !== 200) throw new Error(data.message || JSON.stringify(data));
     log(`Dataset cleaned`, {
       newRows: data.rowCount, newCols: data.columnCount, 
-      actions: data.cleaningActions?.length
+      actions: data.cleanSummary?.length
     });
-    if (data.cleaningActions?.length) {
+    if (data.cleanSummary?.length) {
       console.log('   Actions taken:');
-      data.cleaningActions.forEach(a => console.log('   - ' + a));
+      data.cleanSummary.forEach(a => console.log('   - ' + a));
     }
   } catch (err) {
     logErr('Cleaning failed', err);

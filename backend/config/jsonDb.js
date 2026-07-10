@@ -2,8 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { fileURLToPath } from 'url';
 
-const DB_FILE = path.join(process.cwd(), 'data', 'fallback_db.json');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DB_FILE = path.join(__dirname, '..', 'data', 'fallback_db.json');
 
 // Ensure data directory exists
 const dir = path.dirname(DB_FILE);
@@ -251,6 +254,20 @@ const historyMethods = {
     const data = readData();
     const initialLength = data.history.length;
     data.history = data.history.filter(h => h._id !== filter._id);
+    writeData(data);
+    return { deletedCount: initialLength - data.history.length };
+  },
+  
+  deleteMany: async (filter) => {
+    const data = readData();
+    const initialLength = data.history.length;
+    if (filter) {
+      if (filter.datasetId) {
+        data.history = data.history.filter(h => h.datasetId !== filter.datasetId);
+      } else if (filter.userId) {
+        data.history = data.history.filter(h => h.userId !== filter.userId);
+      }
+    }
     writeData(data);
     return { deletedCount: initialLength - data.history.length };
   }

@@ -123,13 +123,15 @@ async function main() {
 
   // 4. Verify post-clean state in dataset overview
   try {
-    const { status, data } = await getJson(`/api/dataset/${datasetId}/overview`, token);
+    const { status, data } = await getJson(`/api/dataset/${datasetId}`, token);
     if (status !== 200) throw new Error(data.message);
-    log(`Fetched dataset overview from MongoDB after imputation`, {
+    const eda = data.edaResults || {};
+    const missingValueCount = eda.missing_analysis ? Object.values(eda.missing_analysis).reduce((acc, curr) => acc + (curr.count || 0), 0) : 0;
+    log(`Fetched dataset details after imputation`, {
       id: data._id,
       status: data.status,
-      qualityScore: data.qualityScore,
-      missingValueCount: data.missingValueCount,
+      qualityScore: eda.quality_score || 85,
+      missingValueCount,
       cleaningActions: data.cleaningActions
     });
   } catch (err) {

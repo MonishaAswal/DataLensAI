@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Dataset from '../models/Dataset.js';
+import AnalysisHistory from '../models/AnalysisHistory.js';
 import {
   analyzeDatasetFile,
   cleanDatasetFile,
@@ -18,11 +19,41 @@ const uploadDir = path.join(__dirname, '..', 'uploads');
  * @access  Private
  */
 export const uploadDataset = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded' });
-  }
+  let filePath, originalName, size, storageUrl, filename;
 
-  const { path: filePath, originalname: originalName, size } = req.file;
+  if (req.file) {
+    filePath = req.file.path;
+    originalName = req.file.originalname;
+    size = req.file.size;
+    filename = req.file.filename;
+    storageUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
+  } else if (req.body.storageUrl) {
+    storageUrl = req.body.storageUrl;
+    originalName = req.body.originalName || 'dataset.csv';
+    size = req.body.size || 0;
+    
+    // Download file locally for analysis & caching
+    try {
+      console.log(`[MongoDB Upload] Downloading dataset from cloud storage: ${storageUrl}`);
+      const response = await fetch(storageUrl);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      filename = `cloud-${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(originalName)}`;
+      filePath = path.join(uploadDir, filename);
+      await fs.promises.writeFile(filePath, buffer);
+      console.log(`[MongoDB Upload] Cloud dataset downloaded locally to: ${filePath}`);
+    } catch (err) {
+      console.error('[MongoDB Upload] Download failed:', err);
+      return res.status(500).json({ 
+        message: 'Failed to download cloud dataset for analysis.', 
+        error: err.message 
+      });
+    }
+  } else {
+    return res.status(400).json({ message: 'No file uploaded and no storageUrl provided.' });
+  }
 
   try {
     console.log(`[MongoDB Upload] Starting analysis for: ${originalName}`);
@@ -32,15 +63,12 @@ export const uploadDataset = async (req, res) => {
     const columnCount = edaResults.dimensions?.columns || 0;
     const columns = edaResults.columns || [];
 
-    // Construct local file URL for serving via static uploads folder
-    const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-
     // Save dataset details in MongoDB
     const dataset = await Dataset.create({
       userId: req.user._id,
       originalName,
       datasetName: originalName,
-      filename: req.file.filename,
+      filename,
       filePath: filePath,
       size,
       rowCount,
@@ -48,7 +76,7 @@ export const uploadDataset = async (req, res) => {
       columns,
       edaResults,
       status: 'analyzed',
-      storageUrl: fileUrl, // mapped to storageUrl for frontend consistency
+      storageUrl,
       cleaningActions: []
     });
 
@@ -72,19 +100,43 @@ export const uploadDataset = async (req, res) => {
  * @access  Private
  */
 export const cleanDataset = async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: 'No file uploaded for cleaning.' });
+  let filePath, originalName, isTempFile;
+  let dbDataset = null;
+  const targetId = req.params.id || req.body.datasetId;
+
+  if (req.file) {
+    filePath = req.file.path;
+    originalName = req.file.originalname;
+    isTempFile = true;
+  } else {
+    if (!targetId) {
+      return res.status(400).json({ message: 'No file uploaded and no datasetId provided.' });
+    }
+    try {
+      dbDataset = await Dataset.findOne({ _id: targetId, userId: req.user._id });
+      if (!dbDataset) {
+        return res.status(404).json({ message: 'Dataset not found or unauthorized.' });
+      }
+      filePath = dbDataset.filePath;
+      originalName = dbDataset.originalName;
+      isTempFile = false;
+    } catch (err) {
+      return res.status(500).json({ message: 'Error retrieving dataset from database.', error: err.message });
+    }
   }
 
-  const { path: filePath, originalname: originalName } = req.file;
+  console.log(`[MongoDB Clean] Resolved source file. Name: ${originalName}, Path: ${filePath}, isTempFile: ${isTempFile}`);
+  if (dbDataset) {
+    console.log(`[MongoDB Clean] Loaded initial storageUrl from DB: ${dbDataset.storageUrl}`);
+  }
 
-  // Convert inputs from FormData string representation to appropriate types
+  // Convert inputs from FormData string representation or JSON to appropriate types
   const removeDuplicates = req.body.removeDuplicates === 'true' || req.body.removeDuplicates === true;
   const imputeNumeric = req.body.imputeNumeric || 'none';
   const imputeCategorical = req.body.imputeCategorical || 'none';
   const removeEmptyCols = req.body.removeEmptyCols === 'true' || req.body.removeEmptyCols === true;
   const standardizeDates = req.body.standardizeDates === 'true' || req.body.standardizeDates === true;
-  const { datasetId } = req.body;
+  const datasetId = targetId || req.body.datasetId;
 
   try {
     console.log(`[MongoDB Clean] Cleaning dataset: ${originalName}`);
@@ -109,11 +161,12 @@ export const cleanDataset = async (req, res) => {
     const updatedEdaResults = await analyzeDatasetFile(cleanedFilePath, originalName);
 
     // Clean up temporary upload file immediately
-    if (fs.existsSync(filePath)) {
+    if (isTempFile && fs.existsSync(filePath)) {
       try { fs.unlinkSync(filePath); } catch (e) {}
     }
 
     const cleanedUrl = `${req.protocol}://${req.get('host')}/uploads/${cleanedFilename}`;
+    console.log(`[MongoDB Clean] Generated new cleaned storageUrl: ${cleanedUrl}`);
 
     // Update dataset record in MongoDB if datasetId was provided
     let dataset = null;
@@ -137,7 +190,7 @@ export const cleanDataset = async (req, res) => {
         },
         { new: true }
       );
-      console.log(`[MongoDB Clean] Dataset updated in DB. ID: ${datasetId}`);
+      console.log(`[MongoDB Clean] Dataset updated in DB. ID: ${datasetId}. New storageUrl saved: ${dataset?.storageUrl}`);
     }
 
     return res.status(200).json({
@@ -153,7 +206,7 @@ export const cleanDataset = async (req, res) => {
     });
   } catch (error) {
     console.error('Error during data cleaning:', error);
-    if (fs.existsSync(filePath)) {
+    if (isTempFile && fs.existsSync(filePath)) {
       try { fs.unlinkSync(filePath); } catch (e) {}
     }
     return res.status(500).json({
@@ -214,7 +267,19 @@ export const getAIInsights = async (req, res) => {
 export const getDatasets = async (req, res) => {
   try {
     const datasets = await Dataset.find({ userId: req.user._id }).sort({ createdAt: -1 });
-    return res.status(200).json(datasets);
+    const host = req.get('host');
+    const protocol = req.protocol;
+    const mapped = datasets.map(d => {
+      const doc = d.toObject ? d.toObject() : d;
+      if (!doc.storageUrl && doc.filename) {
+        doc.storageUrl = `${protocol}://${host}/uploads/${doc.filename}`;
+        console.log(`[MongoDB getDatasets] Auto-synthesized missing storageUrl for ${doc.originalName}: ${doc.storageUrl}`);
+      } else {
+        console.log(`[MongoDB getDatasets] Loaded storageUrl for ${doc.originalName}: ${doc.storageUrl}`);
+      }
+      return doc;
+    });
+    return res.status(200).json(mapped);
   } catch (error) {
     console.error('Error getting datasets:', error);
     return res.status(500).json({ message: 'Server error retrieving datasets list' });
@@ -232,7 +297,14 @@ export const getDatasetById = async (req, res) => {
     if (!dataset) {
       return res.status(404).json({ message: 'Dataset not found or unauthorized' });
     }
-    return res.status(200).json(dataset);
+    const doc = dataset.toObject ? dataset.toObject() : dataset;
+    if (!doc.storageUrl && doc.filename) {
+      doc.storageUrl = `${req.protocol}://${req.get('host')}/uploads/${doc.filename}`;
+      console.log(`[MongoDB getDatasetById] Auto-synthesized missing storageUrl for single doc: ${doc.storageUrl}`);
+    } else {
+      console.log(`[MongoDB getDatasetById] Loaded storageUrl for single doc: ${doc.storageUrl}`);
+    }
+    return res.status(200).json(doc);
   } catch (error) {
     console.error('Error getting dataset details:', error);
     return res.status(500).json({ message: 'Server error retrieving dataset details' });
@@ -254,7 +326,14 @@ export const updateDataset = async (req, res) => {
     if (!dataset) {
       return res.status(404).json({ message: 'Dataset not found or unauthorized' });
     }
-    return res.status(200).json(dataset);
+    const doc = dataset.toObject ? dataset.toObject() : dataset;
+    if (!doc.storageUrl && doc.filename) {
+      doc.storageUrl = `${req.protocol}://${req.get('host')}/uploads/${doc.filename}`;
+      console.log(`[MongoDB updateDataset] Auto-synthesized missing storageUrl for updated doc: ${doc.storageUrl}`);
+    } else {
+      console.log(`[MongoDB updateDataset] Loaded storageUrl for updated doc: ${doc.storageUrl}`);
+    }
+    return res.status(200).json(doc);
   } catch (error) {
     console.error('Error updating dataset:', error);
     return res.status(500).json({ message: 'Server error updating dataset details' });
@@ -273,12 +352,56 @@ export const deleteDataset = async (req, res) => {
       return res.status(404).json({ message: 'Dataset not found or unauthorized' });
     }
 
-    // Unlink local physical files
+    // 1. Clean up from Supabase Cloud Storage if uploaded to the cloud
+    if (dataset.storageUrl && dataset.storageUrl.includes('/storage/v1/object/public/')) {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+      const bucketName = process.env.VITE_SUPABASE_BUCKET || 'Test_bucket';
+      
+      if (supabaseUrl && anonKey) {
+        const marker = `/object/public/${bucketName}/`;
+        const index = dataset.storageUrl.indexOf(marker);
+        if (index !== -1) {
+          const filePath = dataset.storageUrl.substring(index + marker.length);
+          const deleteUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${filePath}`;
+          
+          try {
+            console.log(`[Supabase Cleanup] Deleting cloud file: ${filePath}`);
+            const response = await fetch(deleteUrl, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${anonKey}`,
+                'apikey': anonKey
+              }
+            });
+            
+            if (!response.ok) {
+              const text = await response.text();
+              console.warn(`[Supabase Cleanup] Failed to delete cloud file. Status: ${response.status}. Response: ${text}`);
+            } else {
+              console.log(`[Supabase Cleanup] Cloud file deleted successfully.`);
+            }
+          } catch (err) {
+            console.error('[Supabase Cleanup] Error deleting from storage:', err);
+          }
+        }
+      }
+    }
+
+    // 2. Unlink local physical files
     if (dataset.filePath && fs.existsSync(dataset.filePath)) {
       try { fs.unlinkSync(dataset.filePath); } catch (e) {}
     }
     if (dataset.cleanedFilePath && fs.existsSync(dataset.cleanedFilePath)) {
       try { fs.unlinkSync(dataset.cleanedFilePath); } catch (e) {}
+    }
+
+    // 3. Cascade delete associated analysis history records
+    try {
+      await AnalysisHistory.deleteMany({ datasetId: req.params.id });
+      console.log(`[Cascade Delete] Removed all history records for dataset ID: ${req.params.id}`);
+    } catch (err) {
+      console.warn(`[Cascade Delete] Failed to clear history logs for dataset ID: ${req.params.id}. Error:`, err.message);
     }
 
     await Dataset.deleteOne({ _id: req.params.id });

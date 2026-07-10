@@ -9,17 +9,23 @@ import datasetRoutes from './routes/datasetRoutes.js';
 import imputationRoutes from './routes/imputation.js';
 import historyRoutes from './routes/historyRoutes.js';
 
-// Load environment variables
-dotenv.config();
+// Config directory resolution for ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from root project folder
+dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 // Connect to MongoDB
 connectDB();
 
-const app = express();
+console.log("[Backend] Loaded environment configurations:", {
+  MONGO_URI: process.env.MONGO_URI || "MISSING (using local fallback_db.json)",
+  GROQ_API_KEY: process.env.GROQ_API_KEY || "MISSING",
+  CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY || "MISSING"
+});
 
-// Config directory resolution for ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const app = express();
 
 // Enable CORS for frontend requests
 app.use(cors({
